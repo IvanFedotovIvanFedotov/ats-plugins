@@ -20,44 +20,28 @@
 
 #include <glib.h>
 #include <gst/gst.h>
-#include "error.h"
 
-#define DATA_MARKER 0x8BA820F0
+typedef enum { BLACK, LUMA, FREEZE, DIFF, BLOCKY, PARAM_NUMBER } PARAMETER;
 
+const char* param_to_string (PARAMETER);
+
+typedef struct __Param       Param;
 typedef struct __VideoParams VideoParams;
-typedef struct __VideoData VideoData;
+
+struct __Param {
+  float min;
+  float max;
+  float avg;
+};
 
 struct __VideoParams {
-  float frozen_pix;
-  float black_pix;
-  float blocks;
-  float avg_bright;
-  float avg_diff;
-  gint64 time; 
+  Param    param[PARAM_NUMBER];
+  gboolean empty[PARAM_NUMBER];
 };
 
-float param_of_video_params (VideoParams*, PARAMETER);
-
-struct __VideoData {
-  guint current;
-  guint frames;
-  VideoParams* data;
-};
-
-VideoData* video_data_new(guint fr);
-#define video_data_reset(dt)(dt->current = 0)
-void video_data_delete(VideoData* dt);
-gint video_data_append(VideoData* dt,
-		       VideoParams* par);
-gboolean video_data_is_full(VideoData* dt);
-gpointer video_data_dump(VideoData* dt, gsize* sz);
-/* convert data into string 
- * format:
- * channel:*:frozen_pix:black_pix:blocks:avg_bright:avg_diff:*:frozen_pix:black_pix:blocks:avg_bright:avg_diff
- */
-gchar* video_data_to_string(VideoData* dt,
-			    const guint stream,
-			    const guint prog,
-			    const guint pid);
+Param* param_of_video_params (VideoParams*, PARAMETER);
+void param_reset (VideoParams*);
+void param_avg (VideoParams*, float);
+void param_add (VideoParams*, PARAMETER, float);
 
 #endif /* VIDEOANALYSIS_API_H */

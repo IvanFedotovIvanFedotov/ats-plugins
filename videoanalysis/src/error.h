@@ -3,10 +3,16 @@
 
 #include <gst/gst.h>
 #include <glib.h>
+#include "videodata.h"
 
-typedef enum { BLACK, LUMA, FREEZE, DIFF, BLOCKY, PARAM_NUMBER } PARAMETER;
-
-const char* param_to_string (PARAMETER);
+typedef struct {
+        guint    counter;
+        guint    size;
+        Param    params;
+        gint64   timestamp;
+        gboolean peak_flag;
+        gboolean cont_flag;
+} Error;
 
 typedef struct {
         gboolean cont_en;
@@ -16,26 +22,12 @@ typedef struct {
         gfloat   duration;
 } BOUNDARY;
 
-typedef struct {
-        gboolean cont;
-        gboolean peak;
-        gint64   time;
-} ErrFlags;
+void err_reset (Error*, guint);
+void err_add_timestamp (Error e [PARAM_NUMBER], gint64 t);
+void err_add_params (Error e [PARAM_NUMBER], VideoParams*);
+gpointer err_dump (Error e [PARAM_NUMBER]);
 
-/*                  flags    boundaries  timestamp uppre_bound? duration duration_d value    */
-void err_flags_cmp (ErrFlags*, BOUNDARY*, gint64, gboolean, float*, float, float);
-
-typedef struct {
-        guint     frames_total;
-        guint     current;
-        ErrFlags* err_flags;
-} Errors;
-
-Errors*  errors_new(guint);
-void     errors_reset(Errors*);
-void     errors_delete(Errors*);
-gint     errors_append(Errors*, ErrFlags[PARAM_NUMBER]);
-gboolean errors_is_full(Errors*);
-gpointer errors_dump(Errors*, gsize*);
+/*                  flags    boundaries upper_bound? duration duration_d value    */
+void err_flags_cmp (Error*, BOUNDARY*, gboolean, float*, float, float);
 
 #endif /* BOUNDARY_H */

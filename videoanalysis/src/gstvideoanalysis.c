@@ -49,6 +49,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <glib.h>
+#include <math.h>
 
 #include "gstvideoanalysis.h"
 
@@ -192,12 +193,12 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
                 g_signal_new("data", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
                              G_STRUCT_OFFSET(GstVideoAnalysisClass, data_signal), NULL, NULL,
                              g_cclosure_marshal_generic, G_TYPE_NONE,
-                             4, G_TYPE_UINT64, GST_TYPE_BUFFER, G_TYPE_UINT64, GST_TYPE_BUFFER);
+                             1, GST_TYPE_BUFFER);
         
         properties [PROP_PERIOD] =
-                g_param_spec_float("period", "Period",
-                                   "Period of time between info masseges",
-                                   0.1, 5., 0.5, G_PARAM_READWRITE);
+                g_param_spec_uint("period", "Period",
+                                  "Measuring period",
+                                  1, 60, 1, G_PARAM_READWRITE);
         properties [PROP_LOSS] =
                 g_param_spec_float("loss", "Loss",
                                    "Video loss",
@@ -311,7 +312,7 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 static void
 gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
 {
-        videoanalysis->fps_period = 1.;
+        videoanalysis->period  = 1;
         videoanalysis->loss    = 1.;
         videoanalysis->black_pixel_lb = 16;
         videoanalysis->pixel_diff_lb = 0;
@@ -323,11 +324,15 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
                         videoanalysis->params_boundary[i].duration = 1.;
         }
         videoanalysis->mark_blocks = 0;
-        videoanalysis->period = 0.5;
         /* private */
+        videoanalysis->frame = 0;
+        videoanalysis->frames_in_sec = 25;
+        videoanalysis->frame_limit = (videoanalysis->frames_in_sec * videoanalysis->period) - 1;
+        videoanalysis->fps_period = 1.;
         for (guint i = 0; i < PARAM_NUMBER; i++) {
                 videoanalysis->cont_err_duration[i] = 0.;
         }
+        
         videoanalysis->past_buffer = (guint8*)malloc(4096*4096);
         videoanalysis->blocks = (BLOCK*)malloc(512*512);
 }
@@ -344,7 +349,7 @@ gst_videoanalysis_set_property (GObject * object,
 
         switch (property_id) {
         case PROP_PERIOD:
-                videoanalysis->period = g_value_get_float(value);
+                videoanalysis->period = g_value_get_uint(value);
                 break;
         case PROP_LOSS:
                 videoanalysis->loss = g_value_get_float(value);
@@ -575,7 +580,9 @@ gst_videoanalysis_start (GstBaseTransform * trans)
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
 
         GST_DEBUG_OBJECT (videoanalysis, "start");
- 
+
+        videoanalysis->frame = 0;
+        
         return TRUE;
 }
 
@@ -586,10 +593,6 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
 
         GST_DEBUG_OBJECT (videoanalysis, "stop");
 
-        if(videoanalysis->data != NULL)
-                video_data_delete(videoanalysis->data);
-        if(videoanalysis->errors != NULL)
-                errors_delete(videoanalysis->errors);
         return TRUE;
 }
 
@@ -605,16 +608,12 @@ gst_videoanalysis_set_info (GstVideoFilter * filter,
 
         GST_DEBUG_OBJECT (videoanalysis, "set_info");
 
-        videoanalysis->fps_period = (float) in_info->fps_d / (float) in_info->fps_n;
-        int period = (int)(videoanalysis->period / videoanalysis->fps_period);
+        videoanalysis->fps_period    = (float) in_info->fps_d / (float) in_info->fps_n;
+        videoanalysis->frames_in_sec = (guint) ceil(in_info->fps_n / in_info->fps_d);
 
-        if (videoanalysis->data != NULL)
-                video_data_delete(videoanalysis->data);
-        if(videoanalysis->errors != NULL)
-                errors_delete(videoanalysis->errors);
-        
-        videoanalysis->data   = video_data_new(period);
-        videoanalysis->errors = errors_new(period);
+        videoanalysis->frame_limit = (videoanalysis->frames_in_sec * videoanalysis->period);
+        param_reset(&videoanalysis->params);
+        err_reset(videoanalysis->errors, videoanalysis->frame_limit);
         
         return TRUE;
 }
@@ -625,28 +624,29 @@ gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
 				      GstVideoFrame * frame)
 {
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (filter);
-        VideoParams params;
-        ErrFlags eflags[PARAM_NUMBER];
+        
+        float params[PARAM_NUMBER];
   
         GST_DEBUG_OBJECT (videoanalysis, "transform_frame_ip");
 
-        gint64 tm = g_get_real_time ();
-        
-        if (video_data_is_full(videoanalysis->data)
-            || errors_is_full(videoanalysis->errors) ){
+        if (videoanalysis->frame == (videoanalysis->frame_limit - 1)) {
+                gint64 tm = g_get_real_time ();
 
-                gsize ds, es;
-                gpointer d = video_data_dump(videoanalysis->data, &ds);
-                gpointer e = errors_dump(videoanalysis->errors, &es);
-                        
-                video_data_reset(videoanalysis->data);
-                errors_reset(videoanalysis->errors);
-                
-                GstBuffer* db = gst_buffer_new_wrapped (d, sizeof(d));
-                GstBuffer* eb = gst_buffer_new_wrapped (e, sizeof(e));
+                param_avg(&videoanalysis->params, (float)(videoanalysis->frame_limit - 1));
+                err_add_timestamp(videoanalysis->errors, tm);
+                err_add_params(videoanalysis->errors, &videoanalysis->params);
 
-                g_signal_emit(videoanalysis, signals[DATA_SIGNAL], 0, ds, db, es, eb);
+                gpointer d = err_dump(videoanalysis->errors);
+                GstBuffer* data = gst_buffer_new_wrapped (d, sizeof(d));
+                g_signal_emit(videoanalysis, signals[DATA_SIGNAL], 0, data);
+
+                videoanalysis->frame = 0;
+                param_reset(&videoanalysis->params);
+                err_reset(videoanalysis->errors, videoanalysis->frame_limit);
+        } else {
+                videoanalysis->frame += 1;
         }
+
         /* params */
         analyse_buffer(frame->data[0],
                        videoanalysis->past_buffer,
@@ -657,21 +657,18 @@ gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
                        videoanalysis->pixel_diff_lb,
                        videoanalysis->mark_blocks,
                        videoanalysis->blocks,
-                       &params);
-        params.time = tm;
+                       params);
         /* errors */
         for (int p = 0; p < PARAM_NUMBER; p++) {
-                float par = param_of_video_params(&params, p);
-                err_flags_cmp(&(eflags[p]),
+                float par = params[p];
+                err_flags_cmp(&(videoanalysis->errors[p]),
                               &(videoanalysis->params_boundary[p]),
-                              tm, TRUE,
+                              TRUE,
                               &(videoanalysis->cont_err_duration[p]),
                               videoanalysis->fps_period,
                               par);
+                param_add(&videoanalysis->params, p, par);
         }
-        /* append params and errors */
-        video_data_append(videoanalysis->data, &params);        
-        errors_append(videoanalysis->errors, eflags);        
 
         return GST_FLOW_OK;
 }

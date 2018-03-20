@@ -62,14 +62,8 @@ analyse_buffer(guint8* data,
 	       guint freez_bnd,
 	       guint mark_blocks,
 	       BLOCK *blocks,
-	       VideoParams *rval)
+	       float rval[PARAM_NUMBER])
 {
-  rval->avg_bright = .0;
-  rval->avg_diff = .0;
-  rval->blocks = .0;
-  rval->black_pix = .0;
-  rval->frozen_pix = .0;
-
   guint w_blocks = width / 8;
   guint h_blocks = height / 8;
   
@@ -193,11 +187,11 @@ analyse_buffer(guint8* data,
       }
     }
   
-  rval->blocks = ((float)blc_counter*100.0) / ((float)(w_blocks-2)*(float)(h_blocks-2));
-  rval->avg_bright = (float)brightness / (height*width);
-  rval->black_pix = ((float)black/((float)height*(float)width))*100.0;
-  rval->avg_diff = (float)difference / (height*width);
-  rval->frozen_pix = (frozen/(height*width))*100.0;
+  rval[BLOCKY] = ((float)blc_counter*100.0) / ((float)(w_blocks-2)*(float)(h_blocks-2));
+  rval[LUMA]   = (float)brightness / (height*width);
+  rval[BLACK]  = ((float)black/((float)height*(float)width))*100.0;
+  rval[DIFF]   = (float)difference / (height*width);
+  rval[FREEZE] = (frozen/(height*width))*100.0;
 }
 
 #endif /* ANALYSIS_H */

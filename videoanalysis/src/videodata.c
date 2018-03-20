@@ -20,92 +20,72 @@
 #include <malloc.h>
 #include <string.h>
 
-float
+Param*
 param_of_video_params (VideoParams* vp, PARAMETER p)
 {
+        return &vp->param[p];
+}
+
+const char*
+param_to_string (PARAMETER p)
+{
         switch (p) {
-        case BLACK:  return vp->black_pix;
-        case LUMA:   return vp->avg_bright;
-        case FREEZE: return vp->frozen_pix;
-        case DIFF:   return vp->avg_diff;
-        case BLOCKY: return vp->blocks;
-        default:     return 0.0;
+        case BLACK: {
+                return "black";
+                break;
+        }
+        case LUMA: {
+                return "luma";
+                break;
+        }
+        case FREEZE: {
+                return "freeze";
+                break;
+        }
+        case DIFF: {
+                return "diff";
+                break;
+        }
+        case BLOCKY: {
+                return "blocky";
+                break;
+        }
+        default:
+                return "unknown";
+                break;
         }
 }
 
-VideoData*
-video_data_new(guint fr)
-{
-  if (fr == 0) return NULL;
-  
-  VideoData* rval;
-  rval = (VideoData*)malloc(sizeof(VideoData));
-  rval->frames = fr;
-  rval->current = 0;
-  rval->data = (VideoParams*)malloc(sizeof(VideoParams) * fr);
-  return rval;
-}
-  
 void
-video_data_delete(VideoData* dt)
-{
-  free(dt->data);
-  dt->data = NULL;
-  free(dt);
-  dt = NULL;
+param_reset (VideoParams* p) {
+        memset(p, 0, sizeof(VideoParams));
+        for (int i = 0; i < PARAM_NUMBER; i++) {
+                p->empty[i] = TRUE;
+        }
 }
 
-gint
-video_data_append(VideoData* dt,
-		  VideoParams* par)
-{
-  if(dt->current == dt->frames) return -1;
-  guint i = dt->current;
-  dt->data[i] = *par;
-  dt->current++;
-  return 0;
+void
+param_avg (VideoParams* p, float sz) {
+        for (int i = 0; i < PARAM_NUMBER; i++) {
+                p->param[i].avg /= sz;
+        }
 }
 
-gboolean
-video_data_is_full(VideoData* dt)
-{
-  if (dt->current == dt->frames) return TRUE;
-  return FALSE;
-}
+void
+param_add (VideoParams* p, PARAMETER d, float v) {
+        Param* par = param_of_video_params(p, d);
+        if (p->empty[d]) {
+                par->max = v;
+                par->min = v;
+                par->avg = v;
+                p->empty[d] = FALSE;
+                return;
+        }
+        if (v > par->max) {
+                par->max = v;
+        } else if (v < par->min) {
+                par->min = v; 
+        }
 
-#include <glib/gprintf.h>
-
-gpointer
-video_data_dump(VideoData* dt, gsize* sz) {
-        if (sz == NULL) return NULL;
-        
-        *sz         = dt->current;
-        VideoParams* buf = (VideoParams*) malloc(sizeof(VideoParams) * (*sz));
-        memcpy(buf, dt->data, (sizeof(VideoParams) * (*sz)));
-        return buf;
-}
-
-gchar*
-video_data_to_string(VideoData* dt,
-		     const guint stream,
-		     const guint prog,
-		     const guint pid)
-{
-  guint i;
-  gchar* string;
-
-  string = g_strdup_printf("v%d:%d:%d", stream, prog, pid);
-  for (i = 0; i < dt->frames; i++) {
-    gchar* pr_str = string;
-    gchar* tmp = g_strdup_printf(":*:%f:%f:%f:%f:%f",
-				 dt->data[i].frozen_pix,
-				 dt->data[i].black_pix,
-				 dt->data[i].blocks,
-				 dt->data[i].avg_bright,
-				 dt->data[i].avg_diff);
-    string = g_strconcat(pr_str, tmp, NULL);
-    g_free(tmp);
-    g_free(pr_str);
-  }
-  return string;
+        par->avg += v;
 }

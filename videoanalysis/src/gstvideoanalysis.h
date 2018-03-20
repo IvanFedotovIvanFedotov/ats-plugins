@@ -46,26 +46,29 @@ struct _GstVideoAnalysis
 {
         GstVideoFilter base_videoanalysis;
         /* public */
-        gfloat period;
-        gfloat loss;
-        guint    black_pixel_lb;
-        guint    pixel_diff_lb;
-        BOUNDARY params_boundary [PARAM_NUMBER];
-        guint    mark_blocks;
+        guint       period;
+        gfloat      loss;
+        guint       black_pixel_lb;
+        guint       pixel_diff_lb;
+        BOUNDARY    params_boundary [PARAM_NUMBER];
+        guint       mark_blocks;
         /* private */
-        float fps_period;
-        gfloat cont_err_duration [PARAM_NUMBER];
-        guint8 *past_buffer;
-        VideoData *data;
-        Errors    *errors;
-        BLOCK *blocks;
+        guint       frame;
+        guint       frame_limit;
+        float       fps_period;
+        guint       frames_in_sec;
+        gfloat      cont_err_duration [PARAM_NUMBER];
+        VideoParams params;
+        Error       errors [PARAM_NUMBER];
+        guint8      *past_buffer;
+        BLOCK       *blocks;
 };
 
 struct _GstVideoAnalysisClass
 {
         GstVideoFilterClass base_videoanalysis_class;
 
-        void (*data_signal) (GstVideoFilter *filter, guint64 ds, GstBuffer* d, guint64 es, GstBuffer* e);
+        void (*data_signal) (GstVideoFilter *filter, GstBuffer* d);
 };
 
 GType gst_videoanalysis_get_type (void);
