@@ -6,8 +6,8 @@
 #include "videodata.h"
 
 typedef struct {
-        guint    counter;
-        guint    size;
+        guint32  counter;
+        guint32  size;
         Param    params;
         gint64   timestamp;
         gboolean peak_flag;

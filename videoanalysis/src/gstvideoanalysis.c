@@ -629,9 +629,10 @@ gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
   
         GST_DEBUG_OBJECT (videoanalysis, "transform_frame_ip");
 
-        if (videoanalysis->frame == (videoanalysis->frame_limit - 1)) {
+        g_print("\tTransform ip: %d\n", videoanalysis->frame_limit);
+        if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
                 gint64 tm = g_get_real_time ();
-
+                g_print("\tTransform Send\n");
                 param_avg(&videoanalysis->params, (float)(videoanalysis->frame_limit - 1));
                 err_add_timestamp(videoanalysis->errors, tm);
                 err_add_params(videoanalysis->errors, &videoanalysis->params);
@@ -643,6 +644,8 @@ gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
                 videoanalysis->frame = 0;
                 param_reset(&videoanalysis->params);
                 err_reset(videoanalysis->errors, videoanalysis->frame_limit);
+                gint64 diff = g_get_real_time () - tm;
+                g_print("\tTransform Send Done: %ld\n", diff);
         } else {
                 videoanalysis->frame += 1;
         }
