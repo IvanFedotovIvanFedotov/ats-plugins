@@ -20,76 +20,45 @@
 #include <malloc.h>
 #include <string.h>
 
-AudioData*
-audio_data_new(guint fr)
-{
-  if (fr == 0) return NULL;
-
-  AudioData* rval;
-  rval = (AudioData*) malloc(sizeof(AudioData));
-  rval->period = fr;
-  rval->current = 0;
-  rval->data = (AudioParams*) malloc(sizeof(AudioParams) * fr);
-  return rval;
+void param_reset (AudioParams* p) {
+        memset(p, 0, sizeof(AudioParams));
+        p->counter_moment = 0;
+        p->counter_shortt = 0;
+}
+void param_avg (AudioParams* p) {
+        p->moment.avg /= (double) p->counter_moment;
+        p->shortt.avg /= (double) p->counter_shortt;
+}
+void param_add_shortt  (AudioParams* p, double v) {
+        if (p->counter_shortt == 0) {
+                p->shortt.avg = v;
+                p->shortt.max = v;
+                p->shortt.min = v;
+                p->counter_shortt++;
+                return;
+        }
+        if (v > p->shortt.max) {
+                p->shortt.max = v;
+        } else if (v < p->shortt.min) {
+                p->shortt.min = v;
+        }
+        p->shortt.avg += v;
+        p->counter_shortt++;
 }
 
-void
-audio_data_delete(AudioData* dt)
-{
-  free(dt->data);
-  dt->data = NULL;
-  free(dt);
-  dt = NULL;
-  return;
-}
-
-int
-audio_data_append(AudioData* dt,
-		  AudioParams* par)
-{
-  if(dt->current == dt->period) return -1;
-  unsigned int i = dt->current;
-  dt->data[i] = *par;
-  dt->current++;
-  return 0;
-}
-
-gboolean
-audio_data_is_full(AudioData* dt)
-{
-  if (dt->current == dt->period) return TRUE;
-  return FALSE;
-}
-
-
-gpointer
-audio_data_dump(AudioData* dt, gsize* sz) {
-        if (sz == NULL) return NULL;
-        
-        *sz = dt->current;
-        AudioParams* buf = (AudioParams*) malloc(sizeof(AudioParams) * (*sz));
-        memcpy(buf, dt->data, (sizeof(AudioParams) * (*sz)));        
-        return buf;
-}
-
-/* a(stream):(prog):(pid):*:moment:shortt:*:moment... */
-gchar*
-audio_data_to_string(AudioData* dt,
-		     const guint stream,
-		     const guint prog,
-		     const guint pid)
-{
-  guint i;
-  gchar* string;
-  string = g_strdup_printf("a%d:%d:%d", stream, prog, pid);
-  for (i = 0; i < dt->period; i++) {
-    gchar* pr_str = string;
-    gchar* tmp = g_strdup_printf(":*:%f:%f",
-				 dt->data[i].moment,
-				 dt->data[i].shortt);
-    string = g_strconcat(pr_str, tmp, NULL);
-    g_free(tmp);
-    g_free(pr_str);
-  }
-  return string;
-}
+void param_add_moment (AudioParams* p, double v) {
+        if (p->counter_moment == 0) {
+                p->moment.avg = v;
+                p->moment.max = v;
+                p->moment.min = v;
+                p->counter_moment++;
+                return;
+        }
+        if (v > p->moment.max) {
+                p->moment.max = v;
+        } else if (v < p->moment.min) {
+                p->moment.min = v;
+        }
+        p->moment.avg += v;
+        p->counter_moment++;
+}   

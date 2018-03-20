@@ -18,7 +18,6 @@ err_flags_cmp (Error* err, BOUNDARY* bounds, gboolean upper, float* dur, float d
                 }
                 cont = *dur > bounds->duration;
         }
-
         if (peak) {
                 err->counter++;
                 err->peak_flag = peak;

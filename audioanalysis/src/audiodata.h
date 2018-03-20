@@ -20,33 +20,25 @@
 
 #include <glib.h>
 
-#define DATA_MARKER 0x8BA820F0
-
+typedef struct __Param       Param;
 typedef struct __AudioParams AudioParams;
-typedef struct __AudioData AudioData;
+
+struct __Param {
+        double min;
+        double max;
+        double avg;
+};
 
 struct __AudioParams {
-        double shortt;
-        double moment;
-        gint64 time;
+        Param    shortt;
+        Param    moment;
+        guint    counter_shortt;
+        guint    counter_moment;
 };
 
-struct __AudioData {
-        guint current;
-        guint period;
-        AudioParams* data;
-};
-
-AudioData* audio_data_new(guint fr);
-#define audio_data_reset(dt)(dt->current = 0)
-void audio_data_delete(AudioData* dt);
-int  audio_data_append(AudioData* dt, AudioParams* par);
-gboolean audio_data_is_full(AudioData* dt);
-gpointer audio_data_dump(AudioData* dt, gsize* sz);
-/* a(stream):(prog):(pid):*:moment:shortt:*:moment... */
-gchar* audio_data_to_string(AudioData* dt,
-			    const guint stream,
-			    const guint prog,
-			    const guint pid);
+void param_reset (AudioParams*);
+void param_avg (AudioParams*);
+void param_add_shortt (AudioParams*, double);
+void param_add_moment (AudioParams*, double);
 
 #endif /* AUDIODATA_H */

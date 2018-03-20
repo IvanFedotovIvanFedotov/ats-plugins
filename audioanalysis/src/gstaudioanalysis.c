@@ -96,6 +96,7 @@ enum
 {
         PROP_0,
         PROP_PROGRAM,
+        PROP_PERIOD,
         PROP_LOSS,
         PROP_ADV_DIFF,
         PROP_ADV_BUF,
@@ -174,12 +175,16 @@ gst_audioanalysis_class_init (GstAudioAnalysisClass * klass)
                 g_signal_new("data", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
                              G_STRUCT_OFFSET(GstAudioAnalysisClass, data_signal), NULL, NULL,
                              g_cclosure_marshal_generic, G_TYPE_NONE,
-                             4, G_TYPE_UINT64, GST_TYPE_BUFFER, G_TYPE_UINT64, GST_TYPE_BUFFER);
-
+                             1, GST_TYPE_BUFFER);
+        properties [PROP_PERIOD] =
+                g_param_spec_uint("period", "Period",
+                                  "Measuring period",
+                                  1, 60, 1, G_PARAM_READWRITE);
         properties [PROP_PROGRAM] =
                 g_param_spec_int("program", "Program",
                                  "Program",
                                  0, G_MAXINT, 2010, G_PARAM_READWRITE);
+        
         properties [PROP_LOSS] =
                 g_param_spec_float("loss", "Loss",
                                    "Audio loss",
@@ -236,6 +241,7 @@ static void
 gst_audioanalysis_init (GstAudioAnalysis *audioanalysis)
 {
         audioanalysis->program = 2010;
+        audioanalysis->period = 1;
         audioanalysis->loss = 1.;
         audioanalysis->adv_diff = 0.5;
         audioanalysis->adv_buf = 100;
@@ -251,8 +257,8 @@ gst_audioanalysis_init (GstAudioAnalysis *audioanalysis)
                 audioanalysis->cont_err_duration[i] = 0.;
         }
         audioanalysis->state = NULL;
-        audioanalysis->data = NULL;
-        audioanalysis->time = 0;
+        audioanalysis->time_eval = 0;
+        audioanalysis->time_send = 0;
         audioanalysis->glob_state = NULL;
         audioanalysis->glob_ad_flag = FALSE;
         audioanalysis->glob_start = 0;
@@ -272,6 +278,9 @@ gst_audioanalysis_set_property (GObject * object,
         case PROP_PROGRAM:
                 audioanalysis->program = g_value_get_int(value);
                 break;
+        case PROP_PERIOD:
+                audioanalysis->period = g_value_get_uint(value);
+                break;
         case PROP_LOSS:
                 audioanalysis->loss = g_value_get_float(value);
                 break;
@@ -282,34 +291,44 @@ gst_audioanalysis_set_property (GObject * object,
                 audioanalysis->adv_buf = g_value_get_int(value);
                 break;
         case PROP_SILENCE_CONT:
-                audioanalysis->params_boundary[SILENCE].cont = g_value_get_float(value);
+                audioanalysis->params_boundary[SILENCE_SHORTT].cont = g_value_get_float(value);
+                audioanalysis->params_boundary[SILENCE_MOMENT].cont = g_value_get_float(value);
                 break;
         case PROP_SILENCE_CONT_EN:
-                audioanalysis->params_boundary[SILENCE].cont_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[SILENCE_SHORTT].cont_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[SILENCE_MOMENT].cont_en = g_value_get_boolean(value);
                 break;
         case PROP_SILENCE_PEAK:
-                audioanalysis->params_boundary[SILENCE].peak = g_value_get_float(value);
+                audioanalysis->params_boundary[SILENCE_SHORTT].peak = g_value_get_float(value);
+                audioanalysis->params_boundary[SILENCE_MOMENT].peak = g_value_get_float(value);
                 break;
         case PROP_SILENCE_PEAK_EN:
-                audioanalysis->params_boundary[SILENCE].peak_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[SILENCE_SHORTT].peak_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[SILENCE_MOMENT].peak_en = g_value_get_boolean(value);
                 break;
         case PROP_SILENCE_DURATION:
-                audioanalysis->params_boundary[SILENCE].duration = g_value_get_float(value);
+                audioanalysis->params_boundary[SILENCE_SHORTT].duration = g_value_get_float(value);
+                audioanalysis->params_boundary[SILENCE_MOMENT].duration = g_value_get_float(value);
                 break;
         case PROP_LOUDNESS_CONT:
-                audioanalysis->params_boundary[LOUDNESS].cont = g_value_get_float(value);
+                audioanalysis->params_boundary[LOUDNESS_SHORTT].cont = g_value_get_float(value);
+                audioanalysis->params_boundary[LOUDNESS_MOMENT].cont = g_value_get_float(value);
                 break;
         case PROP_LOUDNESS_CONT_EN:
-                audioanalysis->params_boundary[LOUDNESS].cont_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[LOUDNESS_SHORTT].cont_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[LOUDNESS_MOMENT].cont_en = g_value_get_boolean(value);
                 break;
         case PROP_LOUDNESS_PEAK:
-                audioanalysis->params_boundary[LOUDNESS].peak = g_value_get_float(value);
+                audioanalysis->params_boundary[LOUDNESS_SHORTT].peak = g_value_get_float(value);
+                audioanalysis->params_boundary[LOUDNESS_MOMENT].peak = g_value_get_float(value);
                 break;
         case PROP_LOUDNESS_PEAK_EN:
-                audioanalysis->params_boundary[LOUDNESS].peak_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[LOUDNESS_SHORTT].peak_en = g_value_get_boolean(value);
+                audioanalysis->params_boundary[LOUDNESS_MOMENT].peak_en = g_value_get_boolean(value);
                 break;
         case PROP_LOUDNESS_DURATION:
-                audioanalysis->params_boundary[LOUDNESS].duration = g_value_get_float(value);
+                audioanalysis->params_boundary[LOUDNESS_SHORTT].duration = g_value_get_float(value);
+                audioanalysis->params_boundary[LOUDNESS_MOMENT].duration = g_value_get_float(value);
                 break;
         default:
                 G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -331,6 +350,9 @@ gst_audioanalysis_get_property (GObject * object,
         case PROP_PROGRAM: 
                 g_value_set_float(value, audioanalysis->program);
                 break;
+        case PROP_PERIOD:
+                g_value_set_uint(value, audioanalysis->period);
+                break;
         case PROP_LOSS: 
                 g_value_set_float(value, audioanalysis->loss);
                 break;
@@ -341,34 +363,34 @@ gst_audioanalysis_get_property (GObject * object,
                 g_value_set_float(value, audioanalysis->adv_buf);
                 break;
         case PROP_SILENCE_CONT:
-                g_value_set_float(value, audioanalysis->params_boundary[SILENCE].cont);
+                g_value_set_float(value, audioanalysis->params_boundary[SILENCE_SHORTT].cont);
                 break;
         case PROP_SILENCE_CONT_EN:
-                g_value_set_boolean(value, audioanalysis->params_boundary[SILENCE].cont_en);
+                g_value_set_boolean(value, audioanalysis->params_boundary[SILENCE_SHORTT].cont_en);
                 break;
         case PROP_SILENCE_PEAK:
-                g_value_set_float(value, audioanalysis->params_boundary[SILENCE].peak);
+                g_value_set_float(value, audioanalysis->params_boundary[SILENCE_SHORTT].peak);
                 break;
         case PROP_SILENCE_PEAK_EN:
-                g_value_set_boolean(value, audioanalysis->params_boundary[SILENCE].peak_en);
+                g_value_set_boolean(value, audioanalysis->params_boundary[SILENCE_SHORTT].peak_en);
                 break;
         case PROP_SILENCE_DURATION:
-                g_value_set_float(value, audioanalysis->params_boundary[SILENCE].duration);
+                g_value_set_float(value, audioanalysis->params_boundary[SILENCE_SHORTT].duration);
                 break;
         case PROP_LOUDNESS_CONT:
-                g_value_set_float(value, audioanalysis->params_boundary[LOUDNESS].cont);
+                g_value_set_float(value, audioanalysis->params_boundary[LOUDNESS_SHORTT].cont);
                 break;
         case PROP_LOUDNESS_CONT_EN:
-                g_value_set_boolean(value, audioanalysis->params_boundary[LOUDNESS].cont_en);
+                g_value_set_boolean(value, audioanalysis->params_boundary[LOUDNESS_SHORTT].cont_en);
                 break;
         case PROP_LOUDNESS_PEAK:
-                g_value_set_float(value, audioanalysis->params_boundary[LOUDNESS].peak);
+                g_value_set_float(value, audioanalysis->params_boundary[LOUDNESS_SHORTT].peak);
                 break;
         case PROP_LOUDNESS_PEAK_EN:
-                g_value_set_boolean(value, audioanalysis->params_boundary[LOUDNESS].peak_en);
+                g_value_set_boolean(value, audioanalysis->params_boundary[LOUDNESS_SHORTT].peak_en);
                 break;
         case PROP_LOUDNESS_DURATION:
-                g_value_set_float(value, audioanalysis->params_boundary[LOUDNESS].duration);
+                g_value_set_float(value, audioanalysis->params_boundary[LOUDNESS_SHORTT].duration);
                 break;
         default:
                 G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -400,11 +422,6 @@ gst_audioanalysis_finalize (GObject * object)
         if (audioanalysis->glob_state != NULL)
                 ebur128_destroy(&audioanalysis->glob_state);
 
-        if (audioanalysis->data != NULL)
-                audio_data_delete(audioanalysis->data);
-        if (audioanalysis->errors != NULL)
-                errors_delete(audioanalysis->errors);
-
         //gst_object_unref(audioanalysis->clock);
 
         G_OBJECT_CLASS (gst_audioanalysis_parent_class)->finalize (object);
@@ -430,15 +447,13 @@ gst_audioanalysis_setup (GstAudioFilter * filter,
                                                  (unsigned long)info->rate,
                                                  EBUR128_MODE_I);
 
-        if (audioanalysis->data != NULL)
-                audio_data_delete(audioanalysis->data);
-        if (audioanalysis->errors != NULL)
-                errors_delete(audioanalysis->errors);
-        
-        audioanalysis->data = audio_data_new(EVAL_PERIOD);
-        audioanalysis->errors = errors_new(EVAL_PERIOD);
+        guint32 per = EVAL_PERIOD * audioanalysis->period;
+        param_reset(&audioanalysis->params);
+        err_reset(audioanalysis->errors, per);
 
-        audioanalysis->time = gst_clock_get_time(GST_ELEMENT(audioanalysis)->clock);
+        GstClockTime t = gst_clock_get_time(GST_ELEMENT(audioanalysis)->clock);
+        audioanalysis->time_eval = t;
+        audioanalysis->time_send = t;
   
         return TRUE;
 }
@@ -488,7 +503,6 @@ gst_audioanalysis_transform_ip (GstBaseTransform * trans,
         GstMapInfo map;
         guint num_frames;
         //time_t now;
-        AudioParams params;
         GstClockTime current_time = gst_clock_get_time(GST_ELEMENT(audioanalysis)->clock);
 
         GST_DEBUG_OBJECT (audioanalysis, "transform_ip");
@@ -513,45 +527,50 @@ gst_audioanalysis_transform_ip (GstBaseTransform * trans,
                 }*/
     
         /* send data for the momentary and short term states */
-        if (audio_data_is_full(audioanalysis->data)
-            || errors_is_full(audioanalysis->errors)) {
-                
-                gsize ds, es;
-                gpointer d = audio_data_dump(audioanalysis->data, &ds);
-                gpointer e = errors_dump(audioanalysis->errors, &es);
+        if (DIFF(current_time, audioanalysis->time_send) >= OBSERVATION_TIME * EVAL_PERIOD * audioanalysis->period) {
+                gint64 tm = g_get_real_time ();
+                param_avg(&audioanalysis->params);
+                err_add_timestamp(audioanalysis->errors, tm);
+                err_add_params(audioanalysis->errors, &audioanalysis->params);
 
-                audio_data_reset(audioanalysis->data);
-                errors_reset(audioanalysis->errors);
+                gpointer d = err_dump(audioanalysis->errors);
+                GstBuffer* data = gst_buffer_new_wrapped (d, sizeof(d));
+                g_signal_emit(audioanalysis, signals[DATA_SIGNAL], 0, data);
 
-                GstBuffer* db = gst_buffer_new_wrapped (d, sizeof(AudioParams) * ds);
-                GstBuffer* eb = gst_buffer_new_wrapped (e, sizeof(ErrFlags) * es * PARAM_NUMBER);
-                
-                g_signal_emit(audioanalysis, signals[DATA_SIGNAL], 0, ds, db, es, eb);
+                audioanalysis->time_send = current_time;
+                param_reset(&audioanalysis->params);
+                err_reset(audioanalysis->errors, EVAL_PERIOD * audioanalysis->period);
         }
 
         /* eval loudness for the 100ms interval */
-        if (DIFF(current_time, audioanalysis->time) >= OBSERVATION_TIME) {
-                gint64 tm = g_get_real_time ();
-                ErrFlags eflags[PARAM_NUMBER];
+        if (DIFF(current_time, audioanalysis->time_eval) >= OBSERVATION_TIME) {
+                double moment, shortt;
     
-                ebur128_loudness_momentary(audioanalysis->state, &(params.moment));
-                ebur128_loudness_shortterm(audioanalysis->state, &(params.shortt));
-                params.time = tm;
+                ebur128_loudness_momentary(audioanalysis->state, &moment);
+                ebur128_loudness_shortterm(audioanalysis->state, &shortt);
 
                 /* errors */
                 for (int p = 0; p < PARAM_NUMBER; p++) {
-                        float par = params.moment;
-                        err_flags_cmp(&(eflags[p]),
-                                      &(audioanalysis->params_boundary[p]),
-                                      tm, param_upper_boundary(p),
-                                      &(audioanalysis->cont_err_duration[p]),
-                                      0.1 /* 100ms */,
-                                      par);
+                        if (p == LOUDNESS_SHORTT || p == SILENCE_SHORTT) {
+                                err_flags_cmp(&(audioanalysis->errors[p]),
+                                              &(audioanalysis->params_boundary[p]),
+                                              param_upper_boundary(p),
+                                              &(audioanalysis->cont_err_duration[p]),
+                                              0.1 /* 100ms */,
+                                              shortt);
+                        } else {
+                                err_flags_cmp(&(audioanalysis->errors[p]),
+                                              &(audioanalysis->params_boundary[p]),
+                                              param_upper_boundary(p),
+                                              &(audioanalysis->cont_err_duration[p]),
+                                              0.1 /* 100ms */,
+                                              moment);
+                        }
                 }
-                audio_data_append(audioanalysis->data, &params);
-                errors_append(audioanalysis->errors, eflags);
+                param_add_shortt(&audioanalysis->params, shortt);
+                param_add_moment(&audioanalysis->params, moment);
                 
-                audioanalysis->time = current_time;
+                audioanalysis->time_eval = current_time;
         }
   
         gst_buffer_unmap(buf, &map);

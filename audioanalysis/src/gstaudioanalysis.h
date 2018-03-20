@@ -51,28 +51,30 @@ struct _GstAudioAnalysis
         /* Public */
         /* TODO add later: period */
         int      program;
+        guint    period;
         float    loss;
         gfloat   adv_diff;
         gint     adv_buf;
         BOUNDARY params_boundary [PARAM_NUMBER];
         /* Private */
         gfloat cont_err_duration [PARAM_NUMBER];
+        AudioParams   params;
+        Error         errors [PARAM_NUMBER];
         ebur128_state *state;
-        AudioData     *data;
-        Errors        *errors;
         /* Global loudless */
         ebur128_state *glob_state;
         gboolean      glob_ad_flag;
         time_t        glob_start;
         //  GstClock* clock;
-        GstClockTime time;
+        GstClockTime  time_eval;
+        GstClockTime  time_send;
 };
 
 struct _GstAudioAnalysisClass
 {
         GstAudioFilterClass base_audioanalysis_class;
 
-        void (*data_signal) (GstAudioFilter *filter, guint64 ds, GstBuffer* d, guint64 es, GstBuffer* e);
+        void (*data_signal) (GstAudioFilter *filter, GstBuffer* d);
 };
 
 GType gst_audioanalysis_get_type (void);
