@@ -51,7 +51,7 @@ struct _GstVideoAnalysis
         guint       black_pixel_lb;
         guint       pixel_diff_lb;
         BOUNDARY    params_boundary [PARAM_NUMBER];
-        guint       mark_blocks;
+        gboolean    mark_blocks;
         /* private */
         guint       frame;
         guint       frame_limit;

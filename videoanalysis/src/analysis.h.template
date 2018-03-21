@@ -60,7 +60,7 @@ analyse_buffer(guint8* data,
 	       guint height,
 	       guint black_bnd,
 	       guint freez_bnd,
-	       guint mark_blocks,
+	       gboolean mark_blocks,
 	       BLOCK *blocks,
 	       float rval[PARAM_NUMBER])
 {

@@ -266,7 +266,7 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
                                    "Freeze err duration",
                                    0., G_MAXFLOAT, 1., G_PARAM_READWRITE);
         properties [PROP_DIFF_CONT] =
-                g_param_spec_float("freeze_diff_cont", "Diff cont err boundary",
+                g_param_spec_float("diff_cont", "Diff cont err boundary",
                                    "Diff cont err meas",
                                    0., G_MAXFLOAT, 1., G_PARAM_READWRITE);
         properties [PROP_DIFF_CONT_EN] =
@@ -302,9 +302,9 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
                                    "Blocky err duration",
                                    0., G_MAXFLOAT, 1., G_PARAM_READWRITE);
         properties [PROP_MARK_BLOCKS] =
-                g_param_spec_uint("mark_blocks", "Mark_blocks",
-                                  "Mark borders of visible blocks",
-                                  0, 256, 0, G_PARAM_READWRITE);
+                g_param_spec_boolean("mark_blocks", "Mark_blocks",
+                                     "Mark borders of visible blocks",
+                                     FALSE, G_PARAM_READWRITE);
 
         g_object_class_install_properties(gobject_class, LAST_PROP, properties);
 }
@@ -323,7 +323,7 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
                         videoanalysis->params_boundary[i].peak_en = FALSE;
                         videoanalysis->params_boundary[i].duration = 1.;
         }
-        videoanalysis->mark_blocks = 0;
+        videoanalysis->mark_blocks = FALSE;
         /* private */
         videoanalysis->frame = 0;
         videoanalysis->frames_in_sec = 25;
@@ -436,7 +436,7 @@ gst_videoanalysis_set_property (GObject * object,
                 videoanalysis->params_boundary[BLOCKY].duration = g_value_get_float(value);
                 break;
         case PROP_MARK_BLOCKS:
-                videoanalysis->mark_blocks = g_value_get_uint(value);
+                videoanalysis->mark_blocks = g_value_get_boolean(value);
                 break;
         default:
                 G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -543,7 +543,7 @@ gst_videoanalysis_get_property (GObject * object,
                 g_value_set_float(value, videoanalysis->params_boundary[BLOCKY].duration);
                 break;
         case PROP_MARK_BLOCKS: 
-                g_value_set_uint(value, videoanalysis->mark_blocks);
+                g_value_set_boolean(value, videoanalysis->mark_blocks);
                 break;
         default:
                 G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
