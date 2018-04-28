@@ -1,0 +1,17 @@
+[package]
+name = "ats-renderers"
+version = "0.1.0"
+authors = ["Freyr <sky_rider_93@mail.ru>"]
+
+[dependencies]
+gst-plugin = "0.2.0"
+glib = "0.5"
+gstreamer = "0.11"
+gstreamer-base = "0.11"
+gstreamer-video = "0.11"
+gstreamer-audio = "0.11"
+
+[lib]
+name = "gstatsrenderers"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
