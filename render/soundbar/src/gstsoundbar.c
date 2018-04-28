@@ -57,9 +57,8 @@ static GstStaticPadTemplate gst_soundbar_sink_template =
                                  GST_STATIC_CAPS ("audio/x-raw, "
                                                   "format = (string) " GST_AUDIO_NE (S16) ", "
                                                   "layout = (string) interleaved, "
-                                                  "rate = (int) [ 8000, 96000 ], "
-                                                  /* "channels = (int) 2, "*/ "channel-mask = (bitmask) 0x3")
-                );
+                                                  "rate = (int) [ 8000, 96000 ]")
+                                         );
 
 enum {
         PROP_0,
@@ -142,7 +141,7 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
                                    .height = GST_VIDEO_INFO_HEIGHT (&base->vinfo),
         };
   
-        render (&scope->state, vi, ai,
+        render (&scope->state, &vi, &ai,
                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
                 (gint16 *) amap.data);
 
