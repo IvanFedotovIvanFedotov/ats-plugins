@@ -143,7 +143,7 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
   
         render (&scope->state, &vi, &ai,
                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
-                (gint16 *) amap.data);
+                amap);
 
         gst_buffer_unmap (audio, &amap);
 
