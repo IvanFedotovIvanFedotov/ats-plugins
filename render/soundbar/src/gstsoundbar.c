@@ -104,7 +104,7 @@ gst_soundbar_init (GstSoundbar * scope) {
 
 static void
 gst_soundbar_finalize (GObject * object) {
-        
+
         GstSoundbar *scope = GST_SOUNDBAR (object);
 
         /* TODO finalize */
@@ -114,7 +114,7 @@ gst_soundbar_finalize (GObject * object) {
 
 static gboolean
 gst_soundbar_setup (GstAudioVisualizer * bscope) {
-        
+
         GstSoundbar *scope = GST_SOUNDBAR (bscope);
 
         /* TODO reset on format change */
@@ -122,10 +122,12 @@ gst_soundbar_setup (GstAudioVisualizer * bscope) {
         return TRUE;
 }
 
+gdouble peaks[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
 static gboolean
 gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
                      GstVideoFrame * video) {
-        
+
         GstSoundbar *scope = GST_SOUNDBAR (base);
         GstMapInfo amap;
         guint num_samples;
@@ -140,11 +142,11 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         vi = (struct video_info) { .width  = GST_VIDEO_INFO_WIDTH (&base->vinfo),
                                    .height = GST_VIDEO_INFO_HEIGHT (&base->vinfo),
         };
-  
-        render (&scope->state, &vi, &ai,
-                (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
-                amap);
-
+        gdouble * peaks1 = render (&scope->state, &vi, &ai,
+                                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
+                                 amap,
+                                 peaks);
+        for (int i=0; i<8; i++) {peaks[i] = peaks1[i];}
         gst_buffer_unmap (audio, &amap);
 
         return TRUE;
@@ -155,11 +157,11 @@ GST_DEBUG_CATEGORY_STATIC (soundbar_debug);
 
 gboolean
 gst_soundbar_plugin_init (GstPlugin * plugin) {
-        
-        GST_DEBUG_CATEGORY_INIT (soundbar_debug, "soundbar", 0, "soundbar");
 
-        return gst_element_register (plugin, "soundbar", GST_RANK_NONE,
-                                     GST_TYPE_SOUNDBAR);
+  GST_DEBUG_CATEGORY_INIT (soundbar_debug, "soundbar", 0, "soundbar");
+
+  return gst_element_register (plugin, "soundbar", GST_RANK_NONE,
+                               GST_TYPE_SOUNDBAR);
 }
 
 /* FIXME: these are normally defined by the GStreamer build system.
