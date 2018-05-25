@@ -132,6 +132,7 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         GstMapInfo amap;
         guint num_samples;
         gint channels = GST_AUDIO_INFO_CHANNELS (&base->ainfo);
+        gint bps  = GST_AUDIO_INFO_RATE (&base->ainfo);
         struct video_info vi;
         struct audio_info ai;
 
@@ -142,11 +143,18 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         vi = (struct video_info) { .width  = GST_VIDEO_INFO_WIDTH (&base->vinfo),
                                    .height = GST_VIDEO_INFO_HEIGHT (&base->vinfo),
         };
+        guint8 channel_width = 10;
+        gboolean horizontal  = FALSE;
         gdouble * peaks1 = render (&scope->state, &vi, &ai,
-                                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
-                                 amap,
-                                 peaks);
-        for (int i=0; i<8; i++) {peaks[i] = peaks1[i];}
+                                   (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
+                                   amap,
+                                   peaks,
+                                   channel_width,
+                                   horizontal,
+                                   bps);
+        for (gint i = 0; i < 8; i++) {
+          peaks[i] = peaks1[i];
+        }
         gst_buffer_unmap (audio, &amap);
 
         return TRUE;
