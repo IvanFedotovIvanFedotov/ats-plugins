@@ -132,7 +132,8 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         GstMapInfo amap;
         guint num_samples;
         gint channels = GST_AUDIO_INFO_CHANNELS (&base->ainfo);
-        gint bps  = GST_AUDIO_INFO_RATE (&base->ainfo);
+        gint rate     = GST_AUDIO_INFO_RATE (&base->ainfo);
+        gint fps      = GST_VIDEO_INFO_FPS_N (&base->vinfo);
         struct video_info vi;
         struct audio_info ai;
 
@@ -151,7 +152,8 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
                                    peaks,
                                    channel_width,
                                    horizontal,
-                                   bps);
+                                   rate,
+                                   fps);
         for (gint i = 0; i < 8; i++) {
           peaks[i] = peaks1[i];
         }

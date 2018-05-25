@@ -39,12 +39,14 @@ inline gdouble * render (struct state * state,
                          gdouble * peaks,
                          guint8 channel_width1,
                          gdouble horizontal,
-                         gint bps) {
+                         gint rate,
+                         gint fps) {
 
   gdouble levels;
   guint16 *data_16 = (guint16 *)amap.data;
   guint16 channel_width;
-  guint8 measurable = 5 * (bps / 1000);
+  guint8 measurable = rate / 200;
+
   if (horizontal) {
     if (((vi->height) - 2 * (ai->channels - 1)) / ai->channels > (channel_width1 - 2) &&
         (channel_width1 - 2) > 0) {
@@ -69,10 +71,10 @@ inline gdouble * render (struct state * state,
 
       gdouble ppm  = 0.0;
 
-      for (gint k = ch; k < amap.size; k = k + ai->channels) {
+      for (gint k = ch; k < amap.size; k = k + ai->channels * 2) {
         gdouble sum = 0.0;
         guint16 num = 0;
-        for (gint j = k - measurable; j < k + measurable; j = j + (ai->channels)) {
+        for (gint j = k - measurable; j < k + measurable; j = j + (ai->channels * 2)) {
           if (j < 0 || j > amap.size - 1) {
             continue;
           }
@@ -86,12 +88,13 @@ inline gdouble * render (struct state * state,
           }
         }
       }
+      gdouble s = 0.1 / (gdouble)fps;
       guint8 loudness = rint(ppm * levels);
-      if (peaks[ch] < ppm) {
+      if (peaks[ch] <= ppm) {
         peaks[ch] = ppm;
       }
       else {
-        peaks[ch] = peaks[ch] - 0.003;
+        peaks[ch] = peaks[ch] - s;
       }
 
       guint16 width;
