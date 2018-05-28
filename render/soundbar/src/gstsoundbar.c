@@ -122,7 +122,7 @@ gst_soundbar_setup (GstAudioVisualizer * bscope) {
         return TRUE;
 }
 
-gdouble peaks[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+static gdouble peaks[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 static gboolean
 gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
@@ -140,23 +140,19 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         gst_buffer_map (audio, &amap, GST_MAP_READ);
 
         num_samples = amap.size / (channels * sizeof (gint16));
-        ai = (struct audio_info) { .samples = num_samples, .channels = channels };
+        ai = (struct audio_info) { .samples = num_samples, .channels = channels, .rate = rate };
         vi = (struct video_info) { .width  = GST_VIDEO_INFO_WIDTH (&base->vinfo),
                                    .height = GST_VIDEO_INFO_HEIGHT (&base->vinfo),
+                                   .fps    = fps
         };
         guint8 channel_width = 10;
         gboolean horizontal  = FALSE;
-        gdouble * peaks1 = render (&scope->state, &vi, &ai,
-                                   (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
-                                   amap,
-                                   peaks,
-                                   channel_width,
-                                   horizontal,
-                                   rate,
-                                   fps);
-        for (gint i = 0; i < 8; i++) {
-          peaks[i] = peaks1[i];
-        }
+        render (&scope->state, &vi, &ai,
+                (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
+                amap,
+                peaks,
+                channel_width,
+                horizontal);
         gst_buffer_unmap (audio, &amap);
 
         return TRUE;
