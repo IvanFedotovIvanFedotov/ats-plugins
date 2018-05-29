@@ -32,13 +32,13 @@ static inline guint32 colour (gdouble level) {
     return black;
 }
 
-static inline horizontal_rendering (struct video_info * vi,
-                                    gdouble peak,
-                                    guint32 * vdata,
-                                    guint16 l_b,
-                                    guint16 r_b,
-                                    gdouble levels,
-                                    guint8 loudness) {
+static inline void horizontal_rendering (struct video_info * vi,
+                                         gdouble peak,
+                                         guint32 * vdata,
+                                         guint16 l_b,
+                                         guint16 r_b,
+                                         gdouble levels,
+                                         guint8 loudness) {
   for (gint h = l_b; h < r_b; h++) {
     gint num;
     num = h * (vi->width) + ((vi->width) * peak);
@@ -50,16 +50,16 @@ static inline horizontal_rendering (struct video_info * vi,
       }
     }
   }
-  return 0;
+  return;
 }
 
-static inline vertical_rendering (struct video_info * vi,
-                                  gdouble peak,
-                                  guint32 * vdata,
-                                  guint16 l_b,
-                                  guint16 r_b,
-                                  gdouble levels,
-                                  guint8 loudness) {
+static inline void vertical_rendering (struct video_info * vi,
+                                       gdouble peak,
+                                       guint32 * vdata,
+                                       guint16 l_b,
+                                       guint16 r_b,
+                                       gdouble levels,
+                                       guint8 loudness) {
   for (gint h = l_b; h < r_b; h++) {
     guint16 peak_lvl;
     gint num;
@@ -73,7 +73,7 @@ static inline vertical_rendering (struct video_info * vi,
       }
     }
   }
-  return 0;
+  return;
 }
 
 static inline gdouble * render (struct state * state,
@@ -112,19 +112,20 @@ static inline gdouble * render (struct state * state,
       gdouble ppm  = 0.0;
 
       for (gint k = ch; k < amap.size; k = k + ai->channels) {
-        gdouble sum = 0.0;
+        guint64 sum = 0;
         guint16 num = 0;
         for (gint j = k - measurable; j < k + measurable; j = j + ai->channels) {
           if (j < 0 || j > amap.size - 1) {
             continue;
           }
-          gdouble sample = ((guint16)data_16[j]) / 65536.0;;
+          guint64 sample = (guint16)data_16[j];
           sum += sample;
           num ++;
         }
         if (num > 0) {
-          if (sum / num > ppm) {
-            ppm = (sum / num);
+          gdouble new_ppm = (gdouble)(sum / num) / 65536.0;
+          if (new_ppm > ppm) {
+            ppm = new_ppm;
           }
         }
       }
