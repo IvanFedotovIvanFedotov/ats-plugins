@@ -94,18 +94,18 @@ static inline gdouble * render (struct state * state,
 
   /* calculations part */
 
-  guint16 width, height;
-  width = horizontal ? vi->height : vi->width;
-  height = horizontal ? vi->width : vi->height;
+  guint16 hor, vert;
+  hor = horizontal ? vi->height : vi->width;
+  vert = horizontal ? vi->width : vi->height;
 
-  if ((width - 2 * (ai->channels - 1)) / ai->channels > (channel_width1 - 2) &&
+  if ((hor - 2 * (ai->channels - 1)) / ai->channels > (channel_width1 - 2) &&
       (channel_width1 - 2) > 0) {
     channel_width = (channel_width1 - 2);
   }
   else {
-    channel_width = floor ((width - 2 * (ai->channels - 1)) / ai->channels);
+    channel_width = floor ((hor - 2 * (ai->channels - 1)) / ai->channels);
   }
-  levels = floor(height / lvl_height);
+  levels = floor(vert / lvl_height);
 
   for (gint ch = 0; ch < (ai->channels); ch++) {
 
@@ -143,9 +143,9 @@ static inline gdouble * render (struct state * state,
 
       /* rendering part */
 
-      guint16 l_b = (width - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
+      guint16 l_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
         channel_width * ch + ch * 2;
-      guint16 r_b = (width - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
+      guint16 r_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
         channel_width * (ch + 1) + ch * 2;
 
       if (horizontal) {

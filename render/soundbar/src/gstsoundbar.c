@@ -127,6 +127,9 @@ static gdouble *peaks;
 static void init () {
   static int n = 6;
   peaks = (gdouble*)malloc(sizeof(int) * n);
+  for (int i = 0; i < n; i++) {
+    peaks[i] = 0.0;
+  }
 }
 
 static gboolean
@@ -154,6 +157,9 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         gboolean horizontal  = FALSE;
         if (sizeof(peaks) < channels) {
           peaks = (gdouble*)realloc(peaks, sizeof(int) * channels);
+          for (int i = 0; i < channels; i++) {
+            peaks[i] = 0.0;
+          }
         }
         render (&scope->state, &vi, &ai,
                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
