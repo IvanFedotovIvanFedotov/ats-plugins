@@ -18,6 +18,7 @@
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
+#define MAX_CHANNEL_N 24
 
 #ifndef LGPL_LIC
 #define LIC "Proprietary"
@@ -122,15 +123,7 @@ gst_soundbar_setup (GstAudioVisualizer * bscope) {
         return TRUE;
 }
 
-static gdouble *peaks;
-
-static void init () {
-  static int n = 6;
-  peaks = (gdouble*)malloc(sizeof(int) * n);
-  for (int i = 0; i < n; i++) {
-    peaks[i] = 0.0;
-  }
-}
+static gdouble peaks[MAX_CHANNEL_N] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 static gboolean
 gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
@@ -155,18 +148,14 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         };
         guint8 channel_width = 10;
         gboolean horizontal  = FALSE;
-        if (sizeof(peaks) < channels) {
-          peaks = (gdouble*)realloc(peaks, sizeof(int) * channels);
-          for (int i = 0; i < channels; i++) {
-            peaks[i] = 0.0;
-          }
-        }
+
         render (&scope->state, &vi, &ai,
                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
                 amap,
                 peaks,
                 channel_width,
-                horizontal);
+                horizontal,
+                MAX_CHANNEL_N);
         gst_buffer_unmap (audio, &amap);
 
         return TRUE;
@@ -179,8 +168,6 @@ gboolean
 gst_soundbar_plugin_init (GstPlugin * plugin) {
 
   GST_DEBUG_CATEGORY_INIT (soundbar_debug, "soundbar", 0, "soundbar");
-
-  init();
 
   return gst_element_register (plugin, "soundbar", GST_RANK_NONE,
                                GST_TYPE_SOUNDBAR);
