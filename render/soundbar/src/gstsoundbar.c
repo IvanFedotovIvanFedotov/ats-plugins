@@ -192,7 +192,7 @@ gst_soundbar_plugin_init (GstPlugin * plugin) {
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
 		   GST_VERSION_MINOR,
-		   videoanalysis,
-		   "Package for video data analysis",
+		   soundbar,
+		   "Package for the imaging of a sound level",
 		   gst_soundbar_plugin_init, VERSION, LIC, PACKAGE_NAME, GST_PACKAGE_ORIGIN)
 
