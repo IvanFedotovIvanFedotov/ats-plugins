@@ -1,14 +1,14 @@
 #include "gstsoundbar.h"
 #include <math.h>
-
-static const guint32 red     = 0x0000ffff;
-static const guint32 orange  = 0x00a5ffff;
-static const guint32 yellow  = 0x00ffffff;
-static const guint32 l_green = 0x00ff00ff;
-static const guint32 green   = 0x008000ff;
+// BGRA ABGR
+static const guint32 red     = 0xff0000ff;
+static const guint32 orange  = 0xff00a5ff;
+static const guint32 yellow  = 0xff00ffff;
+static const guint32 l_green = 0xff00ff00;
+static const guint32 green   = 0xff008000;
 static const guint32 white   = 0xffffffff;    /* 0xNNNNNNNN is 0xBBGGRRAA */
-static const guint32 black   = 0x000000ff;
-static const guint32 transparent_white = 0xffffff00;
+static const guint32 black   = 0xff000000;
+static const guint32 transparent_white = 0x00ffffff;
 static const guint32 transparent_black = 0x00000000;
 
 static const guint8 lvl_height = 5;  /* soundbar level height in px */

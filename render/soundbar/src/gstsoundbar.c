@@ -48,7 +48,7 @@ static GstStaticPadTemplate gst_soundbar_src_template =
         GST_STATIC_PAD_TEMPLATE ("src",
                                  GST_PAD_SRC,
                                  GST_PAD_ALWAYS,
-                                 GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("xRGB"))
+                                 GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("RGBA"))
                 );
 
 static GstStaticPadTemplate gst_soundbar_sink_template =
