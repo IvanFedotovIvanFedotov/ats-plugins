@@ -41,11 +41,13 @@ struct state {
 struct audio_info {
         int samples;
         int channels;
+        int rate;
 };
 
 struct video_info {
         int width;
         int height;
+        int fps;
 };
 
 struct _GstSoundbar {

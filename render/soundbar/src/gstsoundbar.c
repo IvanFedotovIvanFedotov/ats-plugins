@@ -18,6 +18,7 @@
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
+#define MAX_CHANNEL_N 24
 
 #ifndef LGPL_LIC
 #define LIC "Proprietary"
@@ -47,7 +48,7 @@ static GstStaticPadTemplate gst_soundbar_src_template =
         GST_STATIC_PAD_TEMPLATE ("src",
                                  GST_PAD_SRC,
                                  GST_PAD_ALWAYS,
-                                 GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("xRGB"))
+                                 GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("RGBA"))
                 );
 
 static GstStaticPadTemplate gst_soundbar_sink_template =
@@ -104,7 +105,7 @@ gst_soundbar_init (GstSoundbar * scope) {
 
 static void
 gst_soundbar_finalize (GObject * object) {
-        
+
         GstSoundbar *scope = GST_SOUNDBAR (object);
 
         /* TODO finalize */
@@ -114,7 +115,7 @@ gst_soundbar_finalize (GObject * object) {
 
 static gboolean
 gst_soundbar_setup (GstAudioVisualizer * bscope) {
-        
+
         GstSoundbar *scope = GST_SOUNDBAR (bscope);
 
         /* TODO reset on format change */
@@ -122,29 +123,39 @@ gst_soundbar_setup (GstAudioVisualizer * bscope) {
         return TRUE;
 }
 
+static gdouble peaks[MAX_CHANNEL_N] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
 static gboolean
 gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
                      GstVideoFrame * video) {
-        
+
         GstSoundbar *scope = GST_SOUNDBAR (base);
         GstMapInfo amap;
         guint num_samples;
         gint channels = GST_AUDIO_INFO_CHANNELS (&base->ainfo);
+        gint rate     = GST_AUDIO_INFO_RATE (&base->ainfo);
+        gint fps      = GST_VIDEO_INFO_FPS_N (&base->vinfo);
         struct video_info vi;
         struct audio_info ai;
 
         gst_buffer_map (audio, &amap, GST_MAP_READ);
 
         num_samples = amap.size / (channels * sizeof (gint16));
-        ai = (struct audio_info) { .samples = num_samples, .channels = channels };
+        ai = (struct audio_info) { .samples = num_samples, .channels = channels, .rate = rate };
         vi = (struct video_info) { .width  = GST_VIDEO_INFO_WIDTH (&base->vinfo),
                                    .height = GST_VIDEO_INFO_HEIGHT (&base->vinfo),
+                                   .fps    = fps
         };
-  
+        guint8 channel_width = 10;
+        gboolean horizontal  = FALSE;
+
         render (&scope->state, &vi, &ai,
                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
-                (gint16 *) amap.data);
-
+                amap,
+                peaks,
+                channel_width,
+                horizontal,
+                MAX_CHANNEL_N);
         gst_buffer_unmap (audio, &amap);
 
         return TRUE;
@@ -155,11 +166,11 @@ GST_DEBUG_CATEGORY_STATIC (soundbar_debug);
 
 gboolean
 gst_soundbar_plugin_init (GstPlugin * plugin) {
-        
-        GST_DEBUG_CATEGORY_INIT (soundbar_debug, "soundbar", 0, "soundbar");
 
-        return gst_element_register (plugin, "soundbar", GST_RANK_NONE,
-                                     GST_TYPE_SOUNDBAR);
+  GST_DEBUG_CATEGORY_INIT (soundbar_debug, "soundbar", 0, "soundbar");
+
+  return gst_element_register (plugin, "soundbar", GST_RANK_NONE,
+                               GST_TYPE_SOUNDBAR);
 }
 
 /* FIXME: these are normally defined by the GStreamer build system.
@@ -181,7 +192,7 @@ gst_soundbar_plugin_init (GstPlugin * plugin) {
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
 		   GST_VERSION_MINOR,
-		   videoanalysis,
-		   "Package for video data analysis",
+		   soundbar,
+		   "Package for the imaging of a sound level",
 		   gst_soundbar_plugin_init, VERSION, LIC, PACKAGE_NAME, GST_PACKAGE_ORIGIN)
 
