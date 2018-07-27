@@ -96,13 +96,11 @@ static inline gdouble * render (struct state * state,
   gdouble levels;
   guint16 *data_16 = (guint16 *)amap.data;
   guint16 channel_width;
-  gint rate = ai->rate;
   gint fps  = vi->fps;
-  guint8 measurable = rate / 200;   /*  1 s / 200 = 5 ms */
 
   /* making transparent im */
   for (guint i = 0; i < vi->height * vi->width; i++) {
-    vdata[i] = transparent_black;
+    vdata[i] = 0xff000000 || vdata[i];
   }
 
   /* calculations part */
@@ -122,61 +120,55 @@ static inline gdouble * render (struct state * state,
 
   for (gint ch = 0; ch < (ai->channels); ch++) {
 
-      gdouble ppm  = 0.0;
+    gdouble vol = 0.0;
+    guint64 sum = 0;
+    guint16 num = 0;
 
-      for (gint k = ch; k < amap.size; k = k + ai->channels) {
-        guint64 sum = 0;
-        guint16 num = 0;
-        for (gint j = k - measurable; j < k + measurable; j = j + ai->channels) {
-          if (j < 0 || j > amap.size - 1) {
-            continue;
-          }
-          guint64 sample = (guint16)data_16[j];
-          sum += sample;
-          num ++;
-        }
-        if (num > 0) {
-          gdouble new_ppm = (gdouble)(sum / num) / 65536.0;
-          if (new_ppm > ppm) {
-            ppm = new_ppm;
-          }
-        }
+    for (gint k = ch; k < amap.size; k = k + ai->channels) {
+      sum += (guint16)data_16[k];
+      num ++;
+    }
+    if (num > 0) {
+      gdouble new_vol = (gdouble)(sum / num) / 65536.0;
+      if (new_vol > vol) {
+	vol = new_vol;
       }
+    }
+    gdouble s = 0.1 / (gdouble)fps;
 
-      gdouble s = 0.1 / (gdouble)fps;
+    /* rendering part */
+    
+    guint16 l_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
+      channel_width * ch + ch * 2;
+    guint16 r_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
+      channel_width * (ch + 1) + ch * 2;
+    guint8 loudness = rint(vol * levels);
 
-      guint16 l_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
-        channel_width * ch + ch * 2;
-      guint16 r_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
-        channel_width * (ch + 1) + ch * 2;
-      guint8 loudness = rint(ppm * levels);
+    if (ch < max_channel)
+      {
+	if (peaks[ch] <= vol) {
+	  peaks[ch] = vol;
+	}
+	else {
+	  peaks[ch] = peaks[ch] - s;
+	}
 
-      if (ch < max_channel)
-        {
-          if (peaks[ch] <= ppm) {
-            peaks[ch] = ppm;
-          }
-          else {
-            peaks[ch] = peaks[ch] - s;
-          }
-
-          /* rendering part */
-          if (horizontal) {
-            horizontal_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
-          }
-          else {
-            vertical_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
-          }
-        }
-      else
-        {
-          if (horizontal) {
-            horizontal_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
-          }
-          else {
-            vertical_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
-          }
-        }
+	if (horizontal) {
+	  horizontal_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
+	}
+	else {
+	  vertical_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
+	}
+      }
+    else
+      {
+	if (horizontal) {
+	  horizontal_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
+	}
+	else {
+	  vertical_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
+	}
+      }
   }
   return 0;
 }
