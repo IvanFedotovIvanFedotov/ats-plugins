@@ -1,15 +1,15 @@
 CC = gcc
 
 CFLAGS = -Wall -O3 -march=native -fPIC -Wall -c 
-CFLAGS += `pkg-config --cflags gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0`
+CFLAGS += `pkg-config --cflags gstreamer-1.0 gstreamer-video-1.0`
 
 LDFLAGS = -shared -Wall
-LDFLAGS += `pkg-config --libs gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0 glib-2.0`
+LDFLAGS += `pkg-config --libs gstreamer-1.0 gstreamer-video-1.0 glib-2.0`
 
 PY=python3
 
-all: videoanalysis.o
-	@$(CC) $(LDFLAGS) videoanalysis.o -o ../../build/libvideoanalysis.so
+all: error.o videodata.o videoanalysis.o
+	@$(CC) $(LDFLAGS) videodata.o error.o videoanalysis.o -o ../../build/libvideoanalysis.so
 
 error.o:
 	@$(CC) $(CFLAGS) error.c -o error.o
@@ -17,11 +17,11 @@ error.o:
 videodata.o: analysis.h
 	@$(CC) $(CFLAGS) videodata.c -o videodata.o
 
-videoanalysis.o: #analysis.h
+videoanalysis.o: analysis.h
 	@$(CC) $(CFLAGS) gstvideoanalysis.c -o videoanalysis.o
 
 analysis.h:
 	@$(PY) generate_array.py analysis.h.template analysis.h
 
 clean:
-	rm *.o
+	rm *.o analysis.h
