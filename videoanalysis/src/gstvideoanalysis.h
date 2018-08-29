@@ -6,6 +6,7 @@
 #define _GSTVIDEOANALYSIS_
 
 #include <gst/gl/gl.h>
+#include <gst/gl/gstglbasefilter.h>
 
 G_BEGIN_DECLS
 
