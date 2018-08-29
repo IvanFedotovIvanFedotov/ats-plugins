@@ -5,10 +5,11 @@
 #ifndef _GSTVIDEOANALYSIS_
 #define _GSTVIDEOANALYSIS_
 
-#include <gst/gl/gstglfilter.h>
+#include <gst/gl/gl.h>
 
 G_BEGIN_DECLS
 
+GType gst_videoanalysis_get_type (void);
 #define GST_TYPE_VIDEOANALYSIS                  \
         (gst_videoanalysis_get_type())
 #define GST_VIDEOANALYSIS(obj)                                          \
@@ -19,19 +20,25 @@ G_BEGIN_DECLS
         (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_VIDEOANALYSIS))
 #define GST_IS_VIDEOANALYSIS_CLASS(obj)                                 \
         (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_VIDEOANALYSIS))
+#define GST_VIDEOANALYSIS_GET_CLASS(obj)  \
+        (G_TYPE_INSTANCE_GET_CLASS((obj) ,GST_TYPE_VIDEOANALYSIS,GstVideoAnalysisClass))
 
 typedef struct _GstVideoAnalysis GstVideoAnalysis;
 typedef struct _GstVideoAnalysisClass GstVideoAnalysisClass;
 
 struct _GstVideoAnalysis
 {
-        GstGLFilter filter;
+        GstGLBaseFilter    parent;
 
-        GstGLFilterRenderFunc     analysis_func;
+        GstVideoInfo       in_info;
+        GstVideoInfo       out_info;
+
+        //GstGLFilterRenderFunc     analysis_func;
+        GstGLFramebuffer *        fbo;
+        GstGLShader *             shader;
         GstBuffer   *             prev_buffer;
         GstGLMemory *             prev_tex;
         
-        /* public */
         /* guint       period;
         gfloat      loss;
         guint       black_pixel_lb;
@@ -51,12 +58,10 @@ struct _GstVideoAnalysis
 
 struct _GstVideoAnalysisClass
 {
-        GstGLFilterClass filter_class;
+        GstGLBaseFilterClass parent_class;
 
         /* void (*data_signal) (GstVideoFilter *filter, GstBuffer* d); */
 };
-
-GType gst_videoanalysis_get_type (void);
 
 
 G_END_DECLS
