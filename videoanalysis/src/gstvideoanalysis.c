@@ -40,9 +40,8 @@ GST_DEBUG_CATEGORY_STATIC (gst_videoanalysis_debug_category);
 
 static gboolean gst_videoanalysis_start (GstBaseTransform * trans);
 static gboolean gst_videoanalysis_stop  (GstBaseTransform * trans);
-static GstFlowReturn gst_videoanalysis_transform (GstBaseTransform * filter,
-                                                  GstBuffer * inbuf,
-                                                  GstBuffer * outbuf);
+static GstFlowReturn gst_videoanalysis_transform_ip (GstBaseTransform * filter,
+                                                     GstBuffer * inbuf);
 static GstFlowReturn gst_videoanalysis_prepare_output_buffer (GstBaseTransform * filter,
                                                               GstBuffer * inbuf,
                                                               GstBuffer ** outbuf);
@@ -53,7 +52,8 @@ static gboolean gst_videoanalysis_gl_start (GstGLBaseFilter * trans);
 static gboolean gst_videoanalysis_gl_set_caps (GstGLBaseFilter * trans,
                                                GstCaps * incaps,
                                                GstCaps * outcaps);
-static gboolean videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * mem, GstGLMemory * out_mem);
+static GstGLShader * gst_videoanalysis_get_shader (GstVideoAnalysis * va);
+static gboolean videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * mem);
 
 /* signals
 enum
@@ -113,7 +113,7 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 
         base_transform_class->start = gst_videoanalysis_start;
         base_transform_class->stop = gst_videoanalysis_stop;
-        base_transform_class->transform = gst_videoanalysis_transform;
+        base_transform_class->transform_ip = gst_videoanalysis_transform_ip;
         base_transform_class->prepare_output_buffer = gst_videoanalysis_prepare_output_buffer;
         base_transform_class->set_caps = gst_videoanalysis_set_caps;
         base_filter->gl_set_caps = gst_videoanalysis_gl_set_caps;
@@ -238,12 +238,9 @@ static GstFlowReturn gst_videoanalysis_prepare_output_buffer (GstBaseTransform *
 }
 
 static GstFlowReturn
-gst_videoanalysis_transform (GstBaseTransform * trans,
-                             GstBuffer * inbuf,
-                             GstBuffer * outbuf)
+gst_videoanalysis_transform_ip (GstBaseTransform * trans,
+                                GstBuffer * inbuf)
 {
-
-        /*
         GstMemory *tex, *out_tex;
         GstVideoFrame gl_frame, out_frame;
         gboolean ret = GST_FLOW_OK;
@@ -251,67 +248,74 @@ gst_videoanalysis_transform (GstBaseTransform * trans,
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
         if (!gst_video_frame_map (&gl_frame, &videoanalysis->in_info, inbuf,
                                   GST_MAP_READ | GST_MAP_GL)) {
-                //ret = GST_FLOW_ERROR;
+                ret = GST_FLOW_ERROR;
                 goto inbuf_error;
         }
-
-        if (!gst_video_frame_map (&out_frame, &videoanalysis->out_info, outbuf,
-                                  GST_MAP_READ | GST_MAP_GL)) {
-                //ret = GST_FLOW_ERROR;
-                goto outbuf_error;
-        }
-
-        / map[0] corresponds to the Y component of Yuv /
+        
+        /* map[0] corresponds to the Y component of Yuv */
         tex = gl_frame.map[0].memory;
         if (!gst_is_gl_memory (tex)) {
-                //ret = GST_FLOW_ERROR;
+                ret = GST_FLOW_ERROR;
                 GST_ERROR_OBJECT (videoanalysis, "Input memory must be GstGLMemory");
                 goto unmap_error;
         }
 
-        / map[0] corresponds to the Y component of Yuv /
-        out_tex = out_frame.map[0].memory;
-        if (!gst_is_gl_memory (out_tex)) {
-                //ret = GST_FLOW_ERROR;
-                GST_ERROR_OBJECT (videoanalysis, "Output memory must be GstGLMemory");
-                goto unmap_error;
-        }
-
-        videoanalysis_apply (videoanalysis, GST_GL_MEMORY_CAST (tex), GST_GL_MEMORY_CAST (out_tex));
+        videoanalysis_apply (videoanalysis, GST_GL_MEMORY_CAST (tex));
         
         gst_buffer_replace (&videoanalysis->prev_buffer, inbuf);
                 
 unmap_error:
-        gst_video_frame_unmap (&out_frame);
-outbuf_error:
         gst_video_frame_unmap (&gl_frame);
 inbuf_error:
-        */
         return GST_FLOW_OK;
 }
 
 static gboolean
-videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex, GstGLMemory * out_tex)
+videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
 {
         GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
         const GstGLFuncs *gl = context->gl_vtable;
+        GstGLShader * shader = gst_videoanalysis_get_shader(va);
         
-        gst_gl_shader_use (va->shader);
-
+        gst_gl_shader_use (shader);
+        /*
         gl->ActiveTexture (GL_TEXTURE0);
         gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (tex));
 
-        gst_gl_shader_set_uniform_1i (va->shader, "tex", 0);
-        gst_gl_shader_set_uniform_1f (va->shader, "width",
+        gst_gl_shader_set_uniform_1i (shader, "tex", 0);
+        gst_gl_shader_set_uniform_1f (shader, "width",
                                       GST_VIDEO_INFO_WIDTH (&va->in_info));
-        gst_gl_shader_set_uniform_1f (va->shader, "height",
+        gst_gl_shader_set_uniform_1f (shader, "height",
                                       GST_VIDEO_INFO_HEIGHT (&va->in_info));
 
         //gst_gl_framebuffer_draw_to_texture(va->fbo, out_tex, draw, NULL);
 
         va->prev_tex = tex;
-        
+        */
         return TRUE;
+}
+
+static GstGLShader *
+gst_videoanalysis_get_shader (GstVideoAnalysis * va)
+{
+        GError* error = NULL;
+        GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
+        
+        if (! va->shader ) {
+                if (!(va->shader =
+                      gst_gl_shader_new_link_with_stages(context, &error,
+                                                         gst_glsl_stage_new_default_vertex(context),
+                                                         gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
+                                                                                         GST_GLSL_VERSION_450,
+                                                                                         GST_GLSL_PROFILE_CORE
+                                                                                         | GST_GLSL_PROFILE_ES,
+                                                                                         fragment_source),
+                                                         NULL))) {
+                        GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
+                                           ("Failed to initialize shader"), (NULL));
+                }
+        }
+        return va->shader;
 }
         
 static gboolean
