@@ -48,10 +48,6 @@ static GstFlowReturn gst_videoanalysis_prepare_output_buffer (GstBaseTransform *
 static gboolean gst_videoanalysis_set_caps (GstBaseTransform * trans,
                                             GstCaps * incaps,
                                             GstCaps * outcaps);
-static gboolean gst_videoanalysis_gl_start (GstGLBaseFilter * trans);
-static gboolean gst_videoanalysis_gl_set_caps (GstGLBaseFilter * trans,
-                                               GstCaps * incaps,
-                                               GstCaps * outcaps);
 static gboolean videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * mem);
 //static gboolean gst_gl_base_filter_find_gl_context (GstGLBaseFilter * filter);
 
@@ -116,10 +112,7 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
         base_transform_class->start = gst_videoanalysis_start;
         base_transform_class->stop = gst_videoanalysis_stop;
         base_transform_class->transform_ip = gst_videoanalysis_transform_ip;
-        //base_transform_class->prepare_output_buffer = gst_videoanalysis_prepare_output_buffer;
         base_transform_class->set_caps = gst_videoanalysis_set_caps;
-        //base_filter->gl_set_caps = gst_videoanalysis_gl_set_caps;
-        base_filter->gl_start = gst_videoanalysis_gl_start;
         base_filter->supported_gl_api =
                 GST_GL_API_OPENGL | GST_GL_API_GLES2 | GST_GL_API_OPENGL3;
 }
@@ -149,24 +142,6 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
         return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
 
-static void
-shader_create (GstGLContext * context, GstVideoAnalysis * va)
-{
-        GError* error = NULL;
-        if (!(va->shader =
-              gst_gl_shader_new_link_with_stages(context, &error,
-                                                 gst_glsl_stage_new_default_vertex(context),
-                                                 gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
-                                                                                 GST_GLSL_VERSION_450,
-                                                                                 GST_GLSL_PROFILE_CORE
-                                                                                 | GST_GLSL_PROFILE_ES,
-                                                                                 fragment_source),
-                                                 NULL))) {
-                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
-                                   ("Failed to initialize shader"), (NULL));
-        }
-}
-
 static gboolean
 gst_videoanalysis_set_caps (GstBaseTransform * trans,
                             GstCaps * incaps,
@@ -179,8 +154,15 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
         if (!gst_video_info_from_caps (&videoanalysis->out_info, outcaps))
                 goto wrong_caps;
 
-        //gst_gl_base_filter_find_gl_context (GST_GL_BASE_FILTER(trans));
-        //gst_gl_context_thread_add(GST_GL_BASE_FILTER(trans)->context, shader_create, videoanalysis);
+        if (videoanalysis->fbo) {
+                gst_object_unref(videoanalysis->fbo);
+                videoanalysis->fbo = NULL;
+        }
+        
+        if (videoanalysis->shader) {
+                gst_object_unref(videoanalysis->shader);
+                videoanalysis->shader = NULL;
+        }
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->set_caps(trans,incaps,outcaps);
 
@@ -190,78 +172,6 @@ wrong_caps:
         return FALSE;
 }
 
-static gboolean
-gst_videoanalysis_gl_start (GstGLBaseFilter * trans)
-{
-        GError* error = NULL;
-        GstVideoAnalysis *va = GST_VIDEOANALYSIS (trans);
-        //gst_gl_base_filter_find_gl_context (GST_GL_BASE_FILTER(va));
-        GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
-        if (!(va->shader =
-              gst_gl_shader_new_link_with_stages(context, &error,
-                                                 gst_glsl_stage_new_default_vertex(context),
-                                                 gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
-                                                                                 GST_GLSL_VERSION_450,
-                                                                                 GST_GLSL_PROFILE_CORE
-                                                                                 | GST_GLSL_PROFILE_ES,
-                                                                                 fragment_source),
-                                                 NULL))) {
-                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
-                                   ("Failed to initialize shader"), (NULL));
-        }
-        return TRUE;
-}
-        
-
-static gboolean
-gst_videoanalysis_gl_set_caps (GstGLBaseFilter * trans,
-                           GstCaps * incaps,
-                           GstCaps * outcaps)
-{
-        GError* error = NULL;
-        GstVideoAnalysis *va = GST_VIDEOANALYSIS (trans);
-        // GstGLFilterClass *va_class = GST_GL_FILTER_GET_CLASS (filter);
-        GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
-        gint in_width, in_height;
-
-        in_width = GST_VIDEO_INFO_WIDTH (&va->in_info);
-        in_height = GST_VIDEO_INFO_HEIGHT (&va->in_info);
-
-        if (va->fbo)
-                gst_object_unref (va->fbo);
-
-        if (!(va->fbo =
-              gst_gl_framebuffer_new_with_default_depth (context,
-                                                         in_width,
-                                                         in_height)))
-                goto context_error;
-        /*
-        if (filter_class->init_fbo) {
-                if (!filter_class->init_fbo (filter))
-                        goto error;
-        }
-        */
-
-        return TRUE;
-
-context_error:
-        GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND, ("Could not generate FBO"),
-                           (NULL));
-        return FALSE;
-error:
-        GST_ELEMENT_ERROR (va, LIBRARY, INIT,
-                           ("Subclass failed to initialize."), (NULL));
-        return FALSE;
-}
-/*
-static GstFlowReturn gst_videoanalysis_prepare_output_buffer (GstBaseTransform * filter,
-                                                              GstBuffer * inbuf,
-                                                              GstBuffer ** outbuf)
-{
-        *outbuf = inbuf;
-        return GST_FLOW_OK;
-}
-*/
 static GstFlowReturn
 gst_videoanalysis_transform_ip (GstBaseTransform * trans,
                                 GstBuffer * inbuf)
@@ -295,6 +205,26 @@ inbuf_error:
         return GST_FLOW_OK;
 }
 
+static void
+shader_create (GstGLContext * context, GstVideoAnalysis * va)
+{
+        GError* error = NULL;
+        if (!(va->shader =
+              gst_gl_shader_new_link_with_stages(context, &error,
+                                                 gst_glsl_stage_new_default_vertex(context),
+                                                 gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
+                                                                                 GST_GLSL_VERSION_450,
+                                                                                 GST_GLSL_PROFILE_CORE
+                                                                                 | GST_GLSL_PROFILE_ES,
+                                                                                 fragment_source),
+                                                 NULL))) {
+                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
+                                   ("Failed to initialize shader"), (NULL));
+        }
+}
+
+
+
 struct glcb {
         GstVideoAnalysis * va;
         GstGLMemory      * tex;
@@ -306,9 +236,19 @@ analyse (GstGLContext *context, struct glcb * cb)
         GstVideoAnalysis * va = cb->va;
         GstGLMemory      * tex = cb->tex;
         const GstGLFuncs *gl = context->gl_vtable;
+        gint in_width, in_height;
 
+        /* Compile shader */
         if (! va->shader )
                 shader_create(context, va);
+
+        /* Create framebuffer object */
+        in_width = GST_VIDEO_INFO_WIDTH (&va->in_info);
+        in_height = GST_VIDEO_INFO_HEIGHT (&va->in_info);
+
+        va->fbo = gst_gl_framebuffer_new_with_default_depth (context,
+                                                             in_width,
+                                                             in_height);
         
         gst_gl_shader_use (va->shader);
 
@@ -330,7 +270,6 @@ static gboolean
 videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
 {
         struct glcb cb;
-        GstGLSyncMeta *out_sync_meta, *in_sync_meta;
         GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
 
         cb.va = va;
@@ -350,117 +289,6 @@ plugin_init (GstPlugin * plugin)
                                      GST_RANK_NONE,
                                      GST_TYPE_VIDEOANALYSIS);
 }
-
-/*
-static void
-gst_gl_base_filter_gl_start (GstGLContext * context, gpointer data)
-{
-        GstGLBaseFilter *filter = GST_GL_BASE_FILTER (data);
-        GstGLBaseFilterClass *filter_class = GST_GL_BASE_FILTER_GET_CLASS (filter);
-
-        gst_gl_insert_debug_marker (filter->context,
-                                    "starting element %s", GST_OBJECT_NAME (filter));
-
-        filter->priv->gl_started = filter_class->gl_start (filter);
-}
-
-
-static void
-gst_gl_base_filter_gl_stop (GstGLContext * context, gpointer data)
-{
-        GstGLBaseFilter *filter = GST_GL_BASE_FILTER (data);
-        GstGLBaseFilterClass *filter_class = GST_GL_BASE_FILTER_GET_CLASS (filter);
-
-        gst_gl_insert_debug_marker (filter->context,
-                                    "stopping element %s", GST_OBJECT_NAME (filter));
-
-        if (filter->priv->gl_started)
-                filter_class->gl_stop (filter);
-
-        filter->priv->gl_started = FALSE;
-}
-
-gboolean
-gst_gl_base_filter_find_gl_context (GstGLBaseFilter * filter)
-{
-        GstGLBaseFilterClass *filter_class = GST_GL_BASE_FILTER_GET_CLASS (filter);
-        GError *error = NULL;
-        gboolean new_context = FALSE;
-
-        if (!filter->context)
-                new_context = TRUE;
-
-        _find_local_gl_context (filter);
-
-        if (!filter->context) {
-                GST_OBJECT_LOCK (filter->display);
-                do {
-                        if (filter->context)
-                                gst_object_unref (filter->context);
-                        / just get a GL context.  we don't care /
-                        filter->context =
-                                gst_gl_display_get_gl_context_for_thread (filter->display, NULL);
-                        if (!filter->context) {
-                                if (!gst_gl_display_create_context (filter->display,
-                                                                    filter->priv->other_context, &filter->context, &error)) {
-                                        GST_OBJECT_UNLOCK (filter->display);
-                                        goto context_error;
-                                }
-                        }
-                } while (!gst_gl_display_add_context (filter->display, filter->context));
-                GST_OBJECT_UNLOCK (filter->display);
-        }
-
-        if (new_context || !filter->priv->gl_started) {
-                if (filter->priv->gl_started)
-                        gst_gl_context_thread_add (filter->context, gst_gl_base_filter_gl_stop,
-                                                   filter);
-
-                {
-                        GstGLAPI current_gl_api = gst_gl_context_get_gl_api (filter->context);
-                        if ((current_gl_api & filter_class->supported_gl_api) == 0)
-                                goto unsupported_gl_api;
-                }
-
-                gst_gl_context_thread_add (filter->context, gst_gl_base_filter_gl_start,
-                                           filter);
-
-                if (!filter->priv->gl_started)
-                        goto error;
-        }
-
-        return TRUE;
-
-unsupported_gl_api:
-        {
-                GstGLAPI gl_api = gst_gl_context_get_gl_api (filter->context);
-                gchar *gl_api_str = gst_gl_api_to_string (gl_api);
-                gchar *supported_gl_api_str =
-                        gst_gl_api_to_string (filter_class->supported_gl_api);
-
-                GST_ELEMENT_ERROR (filter, RESOURCE, BUSY,
-                                   ("GL API's not compatible context: %s supported: %s", gl_api_str,
-                                    supported_gl_api_str), (NULL));
-
-                g_free (supported_gl_api_str);
-                g_free (gl_api_str);
-                return FALSE;
-        }
-context_error:
-        {
-                GST_ELEMENT_ERROR (filter, RESOURCE, NOT_FOUND, ("%s", error->message),
-                                   (NULL));
-                g_clear_error (&error);
-                return FALSE;
-        }
-error:
-        {
-                GST_ELEMENT_ERROR (filter, LIBRARY, INIT,
-                                   ("Subclass failed to initialize."), (NULL));
-                return FALSE;
-        }
-}
-*/
 
 /* FIXME: these are normally defined by the GStreamer build system.
    If you are creating an element to be included in gst-plugins-*,
