@@ -31,14 +31,15 @@ struct _GstVideoAnalysis
 {
         GstGLBaseFilter    parent;
 
-        GstVideoInfo       in_info;
-        GstVideoInfo       out_info;
-
-        //GstGLFilterRenderFunc     analysis_func;
+        /* <private> */
         GstGLFramebuffer *        fbo;
         GstGLShader *             shader;
-        GstBuffer   *             prev_buffer;
-        GstGLMemory *             prev_tex;
+
+        GstVideoInfo       in_info;
+        GstVideoInfo       out_info;
+        GstGLMemory *      tex;
+        GstBuffer   *      prev_buffer;
+        GstGLMemory *      prev_tex;
         
         /* guint       period;
         gfloat      loss;

@@ -122,6 +122,7 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
 {
         videoanalysis->fbo = NULL;
         videoanalysis->shader = NULL;
+        videoanalysis->tex = NULL;
         videoanalysis->prev_buffer = NULL;
         videoanalysis->prev_tex = NULL;
 }
@@ -138,6 +139,10 @@ static gboolean
 gst_videoanalysis_stop (GstBaseTransform * trans)
 {
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
+
+        videoanalysis->tex = NULL;
+        gst_buffer_replace(&videoanalysis->prev_buffer, NULL);
+        videoanalysis->prev_tex = NULL;
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
@@ -154,15 +159,8 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
         if (!gst_video_info_from_caps (&videoanalysis->out_info, outcaps))
                 goto wrong_caps;
 
-        if (videoanalysis->fbo) {
-                gst_object_unref(videoanalysis->fbo);
-                videoanalysis->fbo = NULL;
-        }
-        
-        if (videoanalysis->shader) {
-                gst_object_unref(videoanalysis->shader);
-                videoanalysis->shader = NULL;
-        }
+        g_clear_object(&videoanalysis->fbo);
+        g_clear_object(&videoanalysis->shader);
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->set_caps(trans,incaps,outcaps);
 
@@ -206,6 +204,17 @@ inbuf_error:
 }
 
 static void
+fbo_create (GstGLContext * context, GstVideoAnalysis * va)
+{
+        gint in_width, in_height;
+        in_width = GST_VIDEO_INFO_WIDTH (&va->in_info);
+        in_height = GST_VIDEO_INFO_HEIGHT (&va->in_info);
+        va->fbo = gst_gl_framebuffer_new_with_default_depth (context,
+                                                             in_width,
+                                                             in_height);
+}
+
+static void
 shader_create (GstGLContext * context, GstVideoAnalysis * va)
 {
         GError* error = NULL;
@@ -223,33 +232,12 @@ shader_create (GstGLContext * context, GstVideoAnalysis * va)
         }
 }
 
-
-
-struct glcb {
-        GstVideoAnalysis * va;
-        GstGLMemory      * tex;
-};
-
 static void
-analyse (GstGLContext *context, struct glcb * cb)
+analyse (GstGLContext *context, GstVideoAnalysis * va)
 {
-        GstVideoAnalysis * va = cb->va;
-        GstGLMemory      * tex = cb->tex;
-        const GstGLFuncs *gl = context->gl_vtable;
-        gint in_width, in_height;
-
-        /* Compile shader */
-        if (! va->shader )
-                shader_create(context, va);
-
-        /* Create framebuffer object */
-        in_width = GST_VIDEO_INFO_WIDTH (&va->in_info);
-        in_height = GST_VIDEO_INFO_HEIGHT (&va->in_info);
-
-        va->fbo = gst_gl_framebuffer_new_with_default_depth (context,
-                                                             in_width,
-                                                             in_height);
-        
+        GstGLMemory      * tex = va->tex;
+        const GstGLFuncs * gl = context->gl_vtable;
+       
         gst_gl_shader_use (va->shader);
 
         gl->ActiveTexture (GL_TEXTURE0);
@@ -269,12 +257,17 @@ analyse (GstGLContext *context, struct glcb * cb)
 static gboolean
 videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
 {
-        struct glcb cb;
         GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
-
-        cb.va = va;
-        cb.tex = tex;
-        gst_gl_context_thread_add(context, (GstGLContextThreadFunc) analyse, &cb);
+        
+        va->tex = tex;
+        /* Compile shader */
+        if (! va->shader )
+                gst_gl_context_thread_add(context, (GstGLContextThreadFunc) shader_create, va);
+        /* Create framebuffer object */
+        if (! va->fbo )
+                gst_gl_context_thread_add(context, (GstGLContextThreadFunc) fbo_create, va);
+        
+        gst_gl_context_thread_add(context, (GstGLContextThreadFunc) analyse, va);
         return TRUE;
 }
    
