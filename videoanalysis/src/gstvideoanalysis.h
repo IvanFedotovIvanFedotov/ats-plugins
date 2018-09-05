@@ -7,6 +7,7 @@
 
 #include <gst/gl/gl.h>
 #include <gst/gl/gstglbasefilter.h>
+#include <GL/gl.h>
 
 G_BEGIN_DECLS
 
@@ -32,14 +33,18 @@ struct _GstVideoAnalysis
         GstGLBaseFilter    parent;
 
         /* <private> */
-        GstGLFramebuffer *        fbo;
-        GstGLShader *             shader;
+        gboolean           gl_settings_unchecked;
+        //GstGLFramebuffer *        fbo;
+        /* GL stuff */
+        GstGLShader *      shader;
+        GstGLShader *      shader_auxilary;
 
-        GstVideoInfo       in_info;
-        GstVideoInfo       out_info;
         GstGLMemory *      tex;
         GstBuffer   *      prev_buffer;
         GstGLMemory *      prev_tex;
+        
+        GstVideoInfo       in_info;
+        GstVideoInfo       out_info;
         
         /* guint       period;
         gfloat      loss;

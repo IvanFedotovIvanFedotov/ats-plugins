@@ -29,6 +29,10 @@
 #endif
 
 #include <gst/gl/gstglfuncs.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GLES3/gl31.h>
+#include <assert.h>
 
 #include "gstvideoanalysis.h"
 #include "analysis.h"
@@ -71,7 +75,7 @@ static GParamSpec *properties[LAST_PROP] = { NULL, };
 
 /* pad templates */
 static const gchar caps_string[] =
-        "video/x-raw(memory:GLMemory),format=(string){I420,NV12,NV21,YV12,IYUV}";
+        "video/x-raw(memory:GLMemory),format=(string){I420,NV12,NV21,YV12}";
 
 /* class initialization */
 G_DEFINE_TYPE_WITH_CODE (GstVideoAnalysis,
@@ -113,18 +117,18 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
         base_transform_class->stop = gst_videoanalysis_stop;
         base_transform_class->transform_ip = gst_videoanalysis_transform_ip;
         base_transform_class->set_caps = gst_videoanalysis_set_caps;
-        base_filter->supported_gl_api =
-                GST_GL_API_OPENGL | GST_GL_API_GLES2 | GST_GL_API_OPENGL3;
+        base_filter->supported_gl_api = GST_GL_API_OPENGL3;
 }
 
 static void
 gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
 {
-        videoanalysis->fbo = NULL;
         videoanalysis->shader = NULL;
+        videoanalysis->shader_auxilary = NULL;
         videoanalysis->tex = NULL;
         videoanalysis->prev_buffer = NULL;
         videoanalysis->prev_tex = NULL;
+        videoanalysis->gl_settings_unchecked = TRUE;
 }
 
 static gboolean
@@ -147,6 +151,7 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
         return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
 
+
 static gboolean
 gst_videoanalysis_set_caps (GstBaseTransform * trans,
                             GstCaps * incaps,
@@ -159,8 +164,8 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
         if (!gst_video_info_from_caps (&videoanalysis->out_info, outcaps))
                 goto wrong_caps;
 
-        g_clear_object(&videoanalysis->fbo);
-        g_clear_object(&videoanalysis->shader);
+        gst_object_replace((GstObject**)&videoanalysis->shader, NULL);
+        gst_object_replace((GstObject**)&videoanalysis->shader_auxilary, NULL);
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->set_caps(trans,incaps,outcaps);
 
@@ -202,7 +207,7 @@ unmap_error:
 inbuf_error:
         return GST_FLOW_OK;
 }
-
+/*
 static void
 fbo_create (GstGLContext * context, GstVideoAnalysis * va)
 {
@@ -213,61 +218,151 @@ fbo_create (GstGLContext * context, GstVideoAnalysis * va)
                                                              in_width,
                                                              in_height);
 }
+*/
 
 static void
 shader_create (GstGLContext * context, GstVideoAnalysis * va)
 {
-        GError* error = NULL;
+        GError * error;
         if (!(va->shader =
               gst_gl_shader_new_link_with_stages(context, &error,
-                                                 gst_glsl_stage_new_default_vertex(context),
-                                                 gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
+                                                 gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
                                                                                  GST_GLSL_VERSION_450,
-                                                                                 GST_GLSL_PROFILE_CORE
-                                                                                 | GST_GLSL_PROFILE_ES,
-                                                                                 fragment_source),
+                                                                                 GST_GLSL_PROFILE_CORE,
+                                                                                 shader_source),
                                                  NULL))) {
                 GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
                                    ("Failed to initialize shader"), (NULL));
         }
+
+        if (!(va->shader_auxilary =
+              gst_gl_shader_new_link_with_stages(context, &error,
+                                                 gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
+                                                                                 GST_GLSL_VERSION_450,
+                                                                                 GST_GLSL_PROFILE_CORE,
+                                                                                 shader_aux_source),
+                                                 NULL))) {
+                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
+                                   ("Failed to initialize auxilary shader"), (NULL));
+        }
 }
+
 
 static void
 analyse (GstGLContext *context, GstVideoAnalysis * va)
 {
-        GstGLMemory      * tex = va->tex;
         const GstGLFuncs * gl = context->gl_vtable;
-       
-        gst_gl_shader_use (va->shader);
+        int width = va->in_info.width;
+        int height = va->in_info.height;
+        int stride = va->in_info.stride[0];
+        GLuint aux_buffer, buffer;
+        float* data;
+        glGetError();
 
-        gl->ActiveTexture (GL_TEXTURE0);
-        gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (tex));
+        if (G_LIKELY(va->prev_tex)) {
+                gl->ActiveTexture (GL_TEXTURE0 + 1);
+                gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->prev_tex));
+                glBindImageTexture(0, gst_gl_memory_get_texture_id (va->prev_tex),
+                                   0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+        }
 
-        gst_gl_shader_set_uniform_1i (va->shader, "tex", 0);
-        gst_gl_shader_set_uniform_1f (va->shader, "width",
-                                      GST_VIDEO_INFO_WIDTH (&va->in_info));
-        gst_gl_shader_set_uniform_1f (va->shader, "height",
-                                      GST_VIDEO_INFO_HEIGHT (&va->in_info));
+        g_printf("Texture: width %d, width %d, stride %d\n",
+                 gst_gl_memory_get_texture_width(va->tex),
+                 width,
+                 stride);  
+      
+        gl->ActiveTexture (GL_TEXTURE0);      
+        gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->tex));
+        glBindImageTexture(0, gst_gl_memory_get_texture_id (va->tex),
+                           0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
 
-        //gst_gl_framebuffer_draw_to_texture(va->fbo, out_tex, draw, NULL);
+        glGenBuffers(1, &aux_buffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, aux_buffer);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, (width / 8) * (height / 8) * sizeof(struct Accumulator),
+                     NULL, GL_DYNAMIC_COPY);
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, aux_buffer);
+        
+        gl->GenBuffers(1, &buffer);
+        gl->BindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+        gl->BufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(GLfloat), NULL, GL_DYNAMIC_COPY);
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 11, buffer, 0, sizeof(GLfloat) * 5);
 
-        va->prev_tex = tex;
+        gst_gl_shader_use (va->shader);        
+
+        GLuint prev_ind = va->prev_tex != 0 ? 1 : 0;
+        gst_gl_shader_set_uniform_1i(va->shader, "tex", 0);
+        gst_gl_shader_set_uniform_1i(va->shader, "tex_prev", prev_ind);
+        gst_gl_shader_set_uniform_1i(va->shader, "width", width);
+        gst_gl_shader_set_uniform_1i(va->shader, "height", height);
+        gst_gl_shader_set_uniform_1i(va->shader, "stride", stride);
+        gst_gl_shader_set_uniform_1i(va->shader, "black_bound", 16);
+        gst_gl_shader_set_uniform_1i(va->shader, "freez_bound", 16);
+
+        glDispatchCompute(width / 8, height / 8, 1);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        
+        gst_gl_shader_use (va->shader_auxilary);
+
+        gst_gl_shader_set_uniform_1i(va->shader_auxilary, "width", width);
+        gst_gl_shader_set_uniform_1i(va->shader_auxilary, "height", height);
+
+        glDispatchCompute(width / 8, 1, 1);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        gl->Finish();
+
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, buffer, 0, sizeof(GLfloat) * 5);
+        data = (float *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, sizeof(GLfloat) * 5, GL_MAP_READ_BIT);
+
+        g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
+                  data[0], data[1], data[2], data[3], data[4]);
+
+        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+        
+        va->prev_tex = va->tex;
+}
+
+static void
+_check_defaults_ (GstGLContext *context, GstVideoAnalysis * va) {
+        const GstGLFuncs * gl = context->gl_vtable;
+        int size, type;
+        
+        glGetInternalformativ(GL_TEXTURE_2D, GL_RED, GL_INTERNALFORMAT_RED_SIZE, 1, &size);
+        glGetInternalformativ(GL_TEXTURE_2D, GL_RED, GL_INTERNALFORMAT_RED_TYPE, 1, &type);
+
+        if (size == 8 && type == GL_UNSIGNED_NORMALIZED) {
+                va->gl_settings_unchecked = FALSE;
+        } else {
+                GST_ERROR("Platform default red representation is not GL_R8");
+                exit(-1);
+        }
 }
 
 static gboolean
 videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
 {
         GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
-        
+
+        /* Check system defaults */
+        if (G_UNLIKELY(va->gl_settings_unchecked)) {
+                gst_gl_context_thread_add(context, (GstGLContextThreadFunc) _check_defaults_, va);
+        }
+        /* Check texture format */
+        if (G_UNLIKELY(gst_gl_memory_get_texture_format(tex) != GST_GL_RED)) {
+                GST_ERROR("GL texture format should be GL_RED");
+                exit(-1);
+        }
+
         va->tex = tex;
+
+        /* */
         /* Compile shader */
         if (! va->shader )
                 gst_gl_context_thread_add(context, (GstGLContextThreadFunc) shader_create, va);
-        /* Create framebuffer object */
-        if (! va->fbo )
-                gst_gl_context_thread_add(context, (GstGLContextThreadFunc) fbo_create, va);
-        
+
         gst_gl_context_thread_add(context, (GstGLContextThreadFunc) analyse, va);
+
         return TRUE;
 }
    

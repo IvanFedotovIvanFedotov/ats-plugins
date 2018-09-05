@@ -1,10 +1,10 @@
 CC = gcc
 
 CFLAGS = -Wall -O3 -march=native -fPIC -Wall -c 
-CFLAGS += `pkg-config --cflags gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0`
+CFLAGS += `pkg-config --cflags gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0 gl`
 
 LDFLAGS = -shared -Wall
-LDFLAGS += `pkg-config --libs gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0 glib-2.0`
+LDFLAGS += `pkg-config --libs gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0 glib-2.0 gl`
 
 PY=python3
 
