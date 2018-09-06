@@ -318,7 +318,11 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
                   data[0], data[1], data[2], data[3], data[4]);
 
+        /* Cleanup */
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
         
         va->prev_tex = va->tex;
 }

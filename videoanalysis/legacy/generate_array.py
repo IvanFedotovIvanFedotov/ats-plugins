@@ -6,11 +6,11 @@ import re
 
 POINTS = 20
 
-WH_LVL = 210
+WH_LVL = 230
 BL_LVL = 40
 
-WH_DIFF = 6
-GR_DIFF = 2
+WH_DIFF = 10
+GR_DIFF = 6
 N = 0
 Knorm = 4
 CEIL = 0.2
