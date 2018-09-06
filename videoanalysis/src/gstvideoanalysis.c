@@ -571,9 +571,12 @@ static GstFlowReturn
 gst_videoanalysis_transform_ip (GstBaseTransform * trans,
                                 GstBuffer * inbuf)
 {
-        GstMemory *tex, *out_tex;
-        GstVideoFrame gl_frame, out_frame;
+        GstMemory *tex;
+        GstVideoFrame gl_frame;
         gboolean ret = GST_FLOW_OK;
+
+        if (G_UNLIKELY(!gst_pad_is_linked (GST_BASE_TRANSFORM_SRC_PAD(trans))))
+                return GST_FLOW_OK;
 
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
         if (!gst_video_frame_map (&gl_frame, &videoanalysis->in_info, inbuf,
@@ -628,7 +631,7 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
 unmap_error:
         gst_video_frame_unmap (&gl_frame);
 inbuf_error:
-        return GST_FLOW_OK;
+        return ret;
 }
 /*
   static void
@@ -691,10 +694,10 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
                                    0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
         }
 
-        g_printf("Texture: width %d, width %d, stride %d\n",
-                 gst_gl_memory_get_texture_width(va->tex),
-                 width,
-                 stride);  
+        //g_printf("Texture: width %d, width %d, stride %d\n",
+        //         gst_gl_memory_get_texture_width(va->tex),
+        //         width,
+        //         stride);  
       
         gl->ActiveTexture (GL_TEXTURE0);      
         gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->tex));
