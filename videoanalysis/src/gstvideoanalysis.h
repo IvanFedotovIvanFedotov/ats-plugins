@@ -9,6 +9,9 @@
 #include <gst/gl/gstglbasefilter.h>
 #include <GL/gl.h>
 
+#include "videodata.h"
+#include "error.h"
+
 G_BEGIN_DECLS
 
 GType gst_videoanalysis_get_type (void);
@@ -45,34 +48,30 @@ struct _GstVideoAnalysis
         GstVideoInfo       in_info;
         GstVideoInfo       out_info;
         /* Interm values */
-        float       blocky;
-        float       frozen;
-        float       luma;
-        float       diff;
-        float       black;
-        
-        /* guint       period;
-        gfloat      loss;
-        guint       black_pixel_lb;
-        guint       pixel_diff_lb;
-        BOUNDARY    params_boundary [PARAM_NUMBER]; */
-        /* private */
-        /* guint       frame;
+        float       values [PARAM_NUMBER];
+
+        /* Frame-related data */
+        guint       frame;
         guint       frame_limit;
         float       fps_period;
         guint       frames_in_sec;
         gfloat      cont_err_duration [PARAM_NUMBER];
         VideoParams params;
         Error       errors [PARAM_NUMBER];
-        guint8      *past_buffer;
-        BLOCK       *blocks; */
+        
+        /* <public> */
+        guint       period;
+        gfloat      loss;
+        guint       black_pixel_lb;
+        guint       pixel_diff_lb;
+        BOUNDARY    params_boundary [PARAM_NUMBER];
 };
 
 struct _GstVideoAnalysisClass
 {
         GstGLBaseFilterClass parent_class;
 
-        /* void (*data_signal) (GstVideoFilter *filter, GstBuffer* d); */
+        void (*data_signal) (GstVideoFilter *filter, GstBuffer* d);
 };
 
 
