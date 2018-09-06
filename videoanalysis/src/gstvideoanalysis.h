@@ -34,17 +34,22 @@ struct _GstVideoAnalysis
 
         /* <private> */
         gboolean           gl_settings_unchecked;
-        //GstGLFramebuffer *        fbo;
         /* GL stuff */
         GstGLShader *      shader;
         GstGLShader *      shader_auxilary;
-
+        /* Textures */
         GstGLMemory *      tex;
         GstBuffer   *      prev_buffer;
         GstGLMemory *      prev_tex;
-        
+        /* VideoInfo */
         GstVideoInfo       in_info;
         GstVideoInfo       out_info;
+        /* Interm values */
+        float       blocky;
+        float       frozen;
+        float       luma;
+        float       diff;
+        float       black;
         
         /* guint       period;
         gfloat      loss;
