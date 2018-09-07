@@ -282,6 +282,7 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
         videoanalysis->tex = NULL;
         videoanalysis->prev_buffer = NULL;
         videoanalysis->prev_tex = NULL;
+        videoanalysis->buffer = 0;
         videoanalysis->gl_settings_unchecked = TRUE;
 
         videoanalysis->period  = 1;
@@ -670,6 +671,15 @@ shader_create (GstGLContext * context, GstVideoAnalysis * va)
                 GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
                                    ("Failed to initialize shader 2"), (NULL));
         }
+        if (va->buffer) {
+                glDeleteBuffers(1, &va->buffer);
+                va->buffer = 0;
+        }
+        glGenBuffers(1, &va->buffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->buffer);
+        glBufferData(GL_SHADER_STORAGE_BUFFER,
+                     (va->in_info.width / 8) * (va->in_info.height / 8) * sizeof(struct Accumulator),
+                     NULL, GL_DYNAMIC_COPY);
 }
 
 
@@ -680,7 +690,6 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         int width = va->in_info.width;
         int height = va->in_info.height;
         int stride = va->in_info.stride[0];
-        GLuint buffer;
         float luma, frozen, diff, black, blocky;
         struct Accumulator * data;
         
@@ -697,17 +706,16 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         //         gst_gl_memory_get_texture_width(va->tex),
         //         width,
         //         stride);  
-      
         gl->ActiveTexture (GL_TEXTURE0);      
         gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->tex));
         glBindImageTexture(0, gst_gl_memory_get_texture_id (va->tex),
                            0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
-
-        glGenBuffers(1, &buffer);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, (width / 8) * (height / 8) * sizeof(struct Accumulator),
-                     NULL, GL_DYNAMIC_COPY);
-        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, buffer);
+        
+        //glGenBuffers(1, &buffer);
+        //glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->buffer);
+        //glBufferData(GL_SHADER_STORAGE_BUFFER, (width / 8) * (height / 8) * sizeof(struct Accumulator),
+        //NULL, GL_DYNAMIC_COPY);
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer);
 
         gst_gl_shader_use (va->shader);        
 
@@ -735,7 +743,7 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
         gl->Finish();
 
-        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, buffer,
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, va->buffer,
                           0, (width / 8) * (height / 8) * sizeof(struct Accumulator));
         data = (struct Accumulator *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
                                                       0, (width / 8) * (height / 8) * sizeof(struct Accumulator),
