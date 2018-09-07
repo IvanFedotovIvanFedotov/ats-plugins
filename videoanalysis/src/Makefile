@@ -1,6 +1,6 @@
 CC = gcc
 
-CFLAGS = -Wall -O3 -march=native -fPIC -Wall -c 
+CFLAGS = -Wall -O3 -march=native -fPIC -Wall -c -g
 CFLAGS += `pkg-config --cflags gstreamer-1.0 gstreamer-video-1.0 gstreamer-gl-1.0 gl`
 
 LDFLAGS = -shared -Wall

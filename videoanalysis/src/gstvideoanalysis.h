@@ -39,6 +39,7 @@ struct _GstVideoAnalysis
         gboolean           gl_settings_unchecked;
         /* GL stuff */
         GstGLShader *      shader;
+        GstGLShader *      shader_block;
         /* Textures */
         GstGLMemory *      tex;
         GstBuffer   *      prev_buffer;
