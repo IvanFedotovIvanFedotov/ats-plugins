@@ -40,6 +40,7 @@ struct _GstVideoAnalysis
         /* GL stuff */
         GstGLShader *      shader;
         GstGLShader *      shader_block;
+        GstGLShader *      shader_accum;
         /* Textures */
         GstGLMemory *      tex;
         GstBuffer   *      prev_buffer;

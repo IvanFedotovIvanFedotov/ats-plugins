@@ -279,6 +279,7 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
 {
         videoanalysis->shader = NULL;
         videoanalysis->shader_block = NULL;
+        videoanalysis->shader_accum = NULL;
         videoanalysis->tex = NULL;
         videoanalysis->prev_buffer = NULL;
         videoanalysis->prev_tex = NULL;
@@ -559,6 +560,7 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
 
         gst_object_replace((GstObject**)&videoanalysis->shader, NULL);
         gst_object_replace((GstObject**)&videoanalysis->shader_block, NULL);
+        gst_object_replace((GstObject**)&videoanalysis->shader_accum, NULL);
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->set_caps(trans,incaps,outcaps);
 
@@ -666,10 +668,20 @@ shader_create (GstGLContext * context, GstVideoAnalysis * va)
                                                  gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
                                                                                  GST_GLSL_VERSION_450,
                                                                                  GST_GLSL_PROFILE_CORE,
-                                                                                 shader_source2),
+                                                                                 shader_source_block),
                                                  NULL))) {
                 GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
-                                   ("Failed to initialize shader 2"), (NULL));
+                                   ("Failed to initialize shader block"), (NULL));
+        }
+        if (!(va->shader_accum =
+              gst_gl_shader_new_link_with_stages(context, &error,
+                                                 gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
+                                                                                 GST_GLSL_VERSION_450,
+                                                                                 GST_GLSL_PROFILE_CORE,
+                                                                                 shader_source_accum),
+                                                 NULL))) {
+                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
+                                   ("Failed to initialize shader accum"), (NULL));
         }
         if (va->buffer) {
                 glDeleteBuffers(1, &va->buffer);
@@ -690,8 +702,8 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         int width = va->in_info.width;
         int height = va->in_info.height;
         int stride = va->in_info.stride[0];
-        float luma, frozen, diff, black, blocky;
-        struct Accumulator * data;
+        GLuint result;
+        float * data;
         
         glGetError();
 
@@ -711,11 +723,13 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         glBindImageTexture(0, gst_gl_memory_get_texture_id (va->tex),
                            0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
         
-        //glGenBuffers(1, &buffer);
-        //glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->buffer);
-        //glBufferData(GL_SHADER_STORAGE_BUFFER, (width / 8) * (height / 8) * sizeof(struct Accumulator),
-        //NULL, GL_DYNAMIC_COPY);
         glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer);
+
+        glGenBuffers(1, &result);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, result);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(float),
+                     NULL, GL_STREAM_READ);
+         glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 11, result);
 
         gst_gl_shader_use (va->shader);        
 
@@ -734,46 +748,41 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
 
         gst_gl_shader_use (va->shader_block);
 
-        gst_gl_shader_set_uniform_1i(va->shader, "tex", 0);
-        gst_gl_shader_set_uniform_1i(va->shader, "width", width);
-        gst_gl_shader_set_uniform_1i(va->shader, "height", height);
+        gst_gl_shader_set_uniform_1i(va->shader_block, "tex", 0);
+        gst_gl_shader_set_uniform_1i(va->shader_block, "width", width);
+        gst_gl_shader_set_uniform_1i(va->shader_block, "height", height);
 
         glDispatchCompute(width / 8, height / 8, 1);
         
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        gl->Finish();
 
-        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, va->buffer,
-                          0, (width / 8) * (height / 8) * sizeof(struct Accumulator));
-        data = (struct Accumulator *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
-                                                      0, (width / 8) * (height / 8) * sizeof(struct Accumulator),
-                                                      GL_MAP_READ_BIT);
+        gst_gl_shader_use (va->shader_accum);
 
-        black = 0.0;
-        frozen = 0.0;
-        luma   = 0.0;
-        diff   = 0.0;
-        blocky = 0.0;
+        gst_gl_shader_set_uniform_1i(va->shader_accum, "width", width);
+        gst_gl_shader_set_uniform_1i(va->shader_accum, "height", height);
+
+        glDispatchCompute(1, 1, 1);
+
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
         
-        for (int i = 0; i < (height * width / 64); i++) {
-                luma   += data[i].bright;
-                diff   += data[i].diff;
-                frozen += data[i].frozen;
-                black  += data[i].black;
-                blocky += (float)data[i].visible;
-        }
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, result,
+                          0, 5 * sizeof(float));
+        data = (float *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
+                                         0, 5 * sizeof(float),
+                                         GL_MAP_READ_BIT);
 
-        va->values[LUMA]   = 256.0 * luma / (float)(height * width);
-        va->values[DIFF]   = 100.0 * diff / (float)(height * width);
-        va->values[BLACK]  = 100.0 * black / (float)(height * width);
-        va->values[FREEZE] = 100.0 * frozen / (float)(height * width);
-        va->values[BLOCKY] = 100.0 * blocky / (float)(height * width / 64);
+        
+        for (int i = 0; i < 5; i++) {
+                va->values[i] = data[i];
+        }
 
         /* Cleanup */
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        glDeleteBuffers(1, &result);
 
         g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
                   va->values[BLOCKY], va->values[LUMA], va->values[BLACK], va->values[DIFF], va->values[FREEZE]);
