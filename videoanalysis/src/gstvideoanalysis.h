@@ -46,6 +46,7 @@ struct _GstVideoAnalysis
         GstBuffer   *      prev_buffer;
         GstGLMemory *      prev_tex;
         GLuint             buffer;
+        GLuint             result;
         /* VideoInfo */
         GstVideoInfo       in_info;
         GstVideoInfo       out_info;

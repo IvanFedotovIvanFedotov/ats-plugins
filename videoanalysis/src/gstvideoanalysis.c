@@ -34,6 +34,7 @@
 #include <GLES3/gl31.h>
 #include <assert.h>
 #include <math.h>
+#include <time.h>
 
 #include "gstvideoanalysis.h"
 #include "analysis.h"
@@ -150,8 +151,8 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 
         gobject_class->set_property = gst_videoanalysis_set_property;
         gobject_class->get_property = gst_videoanalysis_get_property;
-        base_transform_class->passthrough_on_same_caps = TRUE;
-        base_transform_class->transform_ip_on_passthrough = TRUE;
+        base_transform_class->passthrough_on_same_caps = FALSE;
+        //base_transform_class->transform_ip_on_passthrough = TRUE;
         base_transform_class->start = gst_videoanalysis_start;
         base_transform_class->stop = gst_videoanalysis_stop;
         base_transform_class->transform_ip = gst_videoanalysis_transform_ip;
@@ -284,6 +285,7 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
         videoanalysis->prev_buffer = NULL;
         videoanalysis->prev_tex = NULL;
         videoanalysis->buffer = 0;
+        videoanalysis->result = 0;
         videoanalysis->gl_settings_unchecked = TRUE;
 
         videoanalysis->period  = 1;
@@ -538,6 +540,17 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
         return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
 
+static gboolean
+_find_local_gl_context (GstGLBaseFilter * filter)
+{
+  if (gst_gl_query_local_gl_context (GST_ELEMENT (filter), GST_PAD_SRC,
+          &filter->context))
+    return TRUE;
+  if (gst_gl_query_local_gl_context (GST_ELEMENT (filter), GST_PAD_SINK,
+          &filter->context))
+    return TRUE;
+  return FALSE;
+}
 
 static gboolean
 gst_videoanalysis_set_caps (GstBaseTransform * trans,
@@ -561,6 +574,11 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
         gst_object_replace((GstObject**)&videoanalysis->shader, NULL);
         gst_object_replace((GstObject**)&videoanalysis->shader_block, NULL);
         gst_object_replace((GstObject**)&videoanalysis->shader_accum, NULL);
+
+        if (! _find_local_gl_context(GST_GL_BASE_FILTER(trans))) {
+                GST_WARNING ("Could not find a context");
+                return FALSE;
+        }
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->set_caps(trans,incaps,outcaps);
 
@@ -576,7 +594,9 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
 {
         GstMemory *tex;
         GstVideoFrame gl_frame;
-        gboolean ret = GST_FLOW_OK;
+        GstGLContext *context = GST_GL_BASE_FILTER (trans)->context;
+        GstGLSyncMeta *sync_meta;
+        // GstClockTime time = gst_clock_get_time (GST_ELEMENT_CLOCK(trans));
 
         if (G_UNLIKELY(!gst_pad_is_linked (GST_BASE_TRANSFORM_SRC_PAD(trans))))
                 return GST_FLOW_OK;
@@ -584,14 +604,12 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
         if (!gst_video_frame_map (&gl_frame, &videoanalysis->in_info, inbuf,
                                   GST_MAP_READ | GST_MAP_GL)) {
-                ret = GST_FLOW_ERROR;
                 goto inbuf_error;
         }
         
         /* map[0] corresponds to the Y component of Yuv */
         tex = gl_frame.map[0].memory;
         if (!gst_is_gl_memory (tex)) {
-                ret = GST_FLOW_ERROR;
                 GST_ERROR_OBJECT (videoanalysis, "Input memory must be GstGLMemory");
                 goto unmap_error;
         }
@@ -628,13 +646,23 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
                 param_add(&videoanalysis->params, p, par);
         }
 
+        gst_video_frame_unmap (&gl_frame);
+        
+        gst_buffer_add_gl_sync_meta (context, inbuf);
+
+        sync_meta = gst_buffer_get_gl_sync_meta (inbuf);
+        if (sync_meta)
+                gst_gl_sync_meta_set_sync_point (sync_meta, context);
+        //GST_BUFFER_PTS(inbuf) += gst_clock_get_time (GST_ELEMENT_CLOCK(trans)) - time;
         /* Cleanup */
         gst_buffer_replace (&videoanalysis->prev_buffer, inbuf);
+
+        return GST_FLOW_OK;
                 
 unmap_error:
         gst_video_frame_unmap (&gl_frame);
 inbuf_error:
-        return ret;
+        return GST_FLOW_ERROR;
 }
 /*
   static void
@@ -692,6 +720,17 @@ shader_create (GstGLContext * context, GstVideoAnalysis * va)
         glBufferData(GL_SHADER_STORAGE_BUFFER,
                      (va->in_info.width / 8) * (va->in_info.height / 8) * sizeof(struct Accumulator),
                      NULL, GL_DYNAMIC_COPY);
+
+        if (va->result) {
+                glDeleteBuffers(1, &va->result);
+                va->result = 0;
+        }
+        glGenBuffers(1, &va->result);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->result);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(GLfloat),
+                     NULL, GL_DYNAMIC_DRAW);
+
+        g_printf("Create shader\n");
 }
 
 
@@ -702,8 +741,7 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         int width = va->in_info.width;
         int height = va->in_info.height;
         int stride = va->in_info.stride[0];
-        GLuint result;
-        float * data;
+        GLfloat * data = NULL;
         
         glGetError();
 
@@ -725,11 +763,11 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         
         glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer);
 
-        glGenBuffers(1, &result);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, result);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(float),
-                     NULL, GL_STREAM_READ);
-         glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 11, result);
+        //glGenBuffers(1, &result);
+        //glBindBuffer(GL_SHADER_STORAGE_BUFFER, result);
+        // glBufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(float),
+        //             NULL, GL_STREAM_READ);
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 11, va->result);
 
         gst_gl_shader_use (va->shader);        
 
@@ -760,32 +798,35 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
 
         gst_gl_shader_set_uniform_1i(va->shader_accum, "width", width);
         gst_gl_shader_set_uniform_1i(va->shader_accum, "height", height);
-
+        
         glDispatchCompute(1, 1, 1);
 
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        
-        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, result,
-                          0, 5 * sizeof(float));
-        data = (float *)glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
-                                         0, 5 * sizeof(float),
-                                         GL_MAP_READ_BIT);
 
+        glFlush();
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, va->result);
+        //glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->result);
+        //clock_t t = clock();
+        //glGetNamedBufferSubData(va->result, 0, 5 * sizeof(float), data);
+        //data = (GLfloat *)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+        data = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, 5 * sizeof(float), GL_MAP_READ_BIT);
+        //g_print("Result: %f\n", (clock() - t)/(double)CLOCKS_PER_SEC);
         
-        for (int i = 0; i < 5; i++) {
-                va->values[i] = data[i];
-        }
+        //for (int i = 0; i < 5; i++) {
+        //  if (data)
+                //     va->values[0] = data[0];
+        //}
 
         /* Cleanup */
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
+        
+        //glDeleteBuffers(1, &result);
 
-        glDeleteBuffers(1, &result);
-
-        g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
-                  va->values[BLOCKY], va->values[LUMA], va->values[BLACK], va->values[DIFF], va->values[FREEZE]);
+        //g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
+        //          va->values[BLOCKY], va->values[LUMA], va->values[BLACK], va->values[DIFF], va->values[FREEZE]);
         
         va->prev_tex = va->tex;
 }
