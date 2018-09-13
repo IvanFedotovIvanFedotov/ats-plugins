@@ -326,7 +326,7 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
         }
 }
 
-void
+static void
 gst_videoanalysis_set_property (GObject * object,
 				guint property_id,
 				const GValue * value,
@@ -433,7 +433,7 @@ gst_videoanalysis_set_property (GObject * object,
         }
 }
 
-void
+static void
 gst_videoanalysis_get_property (GObject * object,
 				guint property_id,
 				GValue * value,
@@ -747,7 +747,7 @@ shader_create (GstGLContext * context, GstVideoAnalysis * va)
                                                  NULL))) {
                 GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
                                    ("Failed to initialize shader block"), (NULL));
-
+        }
         for (int i = 0; i < va->latency; i++) {
                 if (va->buffer[i]) {
                         glDeleteBuffers(1, &va->buffer[i]);
