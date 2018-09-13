@@ -348,7 +348,7 @@ gst_audioanalysis_get_property (GObject * object,
 
         switch (property_id) {
         case PROP_PROGRAM: 
-                g_value_set_float(value, audioanalysis->program);
+                g_value_set_int(value, audioanalysis->program);
                 break;
         case PROP_PERIOD:
                 g_value_set_uint(value, audioanalysis->period);
@@ -360,7 +360,7 @@ gst_audioanalysis_get_property (GObject * object,
                 g_value_set_float(value, audioanalysis->adv_diff);
                 break;
         case PROP_ADV_BUF: 
-                g_value_set_float(value, audioanalysis->adv_buf);
+                g_value_set_int(value, audioanalysis->adv_buf);
                 break;
         case PROP_SILENCE_CONT:
                 g_value_set_float(value, audioanalysis->params_boundary[SILENCE_SHORTT].cont);
