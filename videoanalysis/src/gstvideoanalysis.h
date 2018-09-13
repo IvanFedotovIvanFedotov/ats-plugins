@@ -12,6 +12,8 @@
 #include "videodata.h"
 #include "error.h"
 
+#define MAX_LATENCY 24
+
 G_BEGIN_DECLS
 
 GType gst_videoanalysis_get_type (void);
@@ -36,22 +38,23 @@ struct _GstVideoAnalysis
         GstGLBaseFilter    parent;
 
         /* <private> */
+        guint              buffer_ptr;
         gboolean           gl_settings_unchecked;
         /* GL stuff */
         GstGLShader *      shader;
         GstGLShader *      shader_block;
-        GstGLShader *      shader_accum;
+        //GstGLShader *      shader_accum;
         /* Textures */
         GstGLMemory *      tex;
         GstBuffer   *      prev_buffer;
         GstGLMemory *      prev_tex;
-        GLuint             buffer;
-        GLuint             result;
+        GLuint             buffer [MAX_LATENCY];
+        //GLuint             result [MAX_LATENCY];
         /* VideoInfo */
         GstVideoInfo       in_info;
         GstVideoInfo       out_info;
         /* Interm values */
-        float       values [PARAM_NUMBER];
+        struct Accumulator * acc_buffer;
 
         /* Frame-related data */
         guint       frame;
@@ -63,6 +66,7 @@ struct _GstVideoAnalysis
         Error       errors [PARAM_NUMBER];
         
         /* <public> */
+        guint       latency;
         guint       period;
         gfloat      loss;
         guint       black_pixel_lb;

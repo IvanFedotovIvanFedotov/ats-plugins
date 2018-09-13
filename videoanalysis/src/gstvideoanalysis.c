@@ -39,6 +39,14 @@
 #include "gstvideoanalysis.h"
 #include "analysis.h"
 
+#define MODULUS(n,m)                            \
+        ({                                      \
+        __typeof__(n) _n = (n);                 \
+        __typeof__(m) _m = (m);                 \
+        __typeof__(n) res = _n % _m;            \
+        res < 0 ? _m + res : res;               \
+        })
+
 #define GST_CAT_DEFAULT gst_videoanalysis_debug_category
 GST_DEBUG_CATEGORY_STATIC (gst_videoanalysis_debug_category);
 
@@ -76,6 +84,7 @@ enum
 enum
 {
         PROP_0,
+        PROP_LATENCY,
         PROP_PERIOD,
         PROP_LOSS,
         PROP_BLACK_PIXEL_LB,
@@ -164,7 +173,11 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
                              G_STRUCT_OFFSET(GstVideoAnalysisClass, data_signal), NULL, NULL,
                              g_cclosure_marshal_generic, G_TYPE_NONE,
                              1, GST_TYPE_BUFFER);
-        
+
+        properties [PROP_LATENCY] =
+                g_param_spec_uint("latency", "Latency",
+                                  "Measurment latency (frame), bigger latency may reduce GPU stalling. 1 - instant measurment, 2 - 1-frame latency, etc.",
+                                  1, MAX_LATENCY, 3, G_PARAM_READWRITE);
         properties [PROP_PERIOD] =
                 g_param_spec_uint("period", "Period",
                                   "Measuring period",
@@ -278,15 +291,19 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 static void
 gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
 {
+        videoanalysis->latency = 3;
+        videoanalysis->buffer_ptr = 0;
+        videoanalysis->acc_buffer = NULL;
         videoanalysis->shader = NULL;
         videoanalysis->shader_block = NULL;
-        videoanalysis->shader_accum = NULL;
         videoanalysis->tex = NULL;
         videoanalysis->prev_buffer = NULL;
         videoanalysis->prev_tex = NULL;
-        videoanalysis->buffer = 0;
-        videoanalysis->result = 0;
         videoanalysis->gl_settings_unchecked = TRUE;
+
+        for (int i = 0; i < MAX_LATENCY; i++) {
+                videoanalysis->buffer[i] = 0;
+        }
 
         videoanalysis->period  = 1;
         videoanalysis->loss    = 1.;
@@ -320,6 +337,9 @@ gst_videoanalysis_set_property (GObject * object,
         GST_DEBUG_OBJECT (videoanalysis, "set_property");
 
         switch (property_id) {
+        case PROP_LATENCY:
+                videoanalysis->latency = g_value_get_uint(value);
+                break;
         case PROP_PERIOD:
                 videoanalysis->period = g_value_get_uint(value);
                 break;
@@ -424,8 +444,11 @@ gst_videoanalysis_get_property (GObject * object,
         GST_DEBUG_OBJECT (videoanalysis, "get_property");
 
         switch (property_id) {
+        case PROP_LATENCY: 
+                g_value_set_uint(value, videoanalysis->latency);
+                break;
         case PROP_PERIOD: 
-                g_value_set_float(value, videoanalysis->period);
+                g_value_set_uint(value, videoanalysis->period);
                 break;
         case PROP_LOSS: 
                 g_value_set_float(value, videoanalysis->loss);
@@ -571,9 +594,16 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
         param_reset(&videoanalysis->params);
         err_reset(videoanalysis->errors, videoanalysis->frame_limit);
 
+        if (videoanalysis->acc_buffer)
+                free(videoanalysis->acc_buffer);
+
+        videoanalysis->acc_buffer =
+                (struct Accumulator *) malloc((videoanalysis->in_info.width / 8)
+                                              * (videoanalysis->in_info.height / 8)
+                                              * sizeof(struct Accumulator));
+
         gst_object_replace((GstObject**)&videoanalysis->shader, NULL);
         gst_object_replace((GstObject**)&videoanalysis->shader_block, NULL);
-        gst_object_replace((GstObject**)&videoanalysis->shader_accum, NULL);
 
         if (! _find_local_gl_context(GST_GL_BASE_FILTER(trans))) {
                 GST_WARNING ("Could not find a context");
@@ -596,12 +626,15 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
         GstVideoFrame gl_frame;
         GstGLContext *context = GST_GL_BASE_FILTER (trans)->context;
         GstGLSyncMeta *sync_meta;
+        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
+        int         height = videoanalysis->in_info.height;
+        int         width  = videoanalysis->in_info.width;
+        float       values [PARAM_NUMBER];
         // GstClockTime time = gst_clock_get_time (GST_ELEMENT_CLOCK(trans));
 
         if (G_UNLIKELY(!gst_pad_is_linked (GST_BASE_TRANSFORM_SRC_PAD(trans))))
                 return GST_FLOW_OK;
 
-        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
         if (!gst_video_frame_map (&gl_frame, &videoanalysis->in_info, inbuf,
                                   GST_MAP_READ | GST_MAP_GL)) {
                 goto inbuf_error;
@@ -615,6 +648,20 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
         }
 
         videoanalysis_apply (videoanalysis, GST_GL_MEMORY_CAST (tex));
+
+        for (int i = 0; i < (width * height / 64); i++) {
+                values[FREEZE] += videoanalysis->acc_buffer[i].frozen;
+                values[BLACK] += videoanalysis->acc_buffer[i].black;
+                values[DIFF] += videoanalysis->acc_buffer[i].diff;
+                values[LUMA] += videoanalysis->acc_buffer[i].bright;
+                values[BLOCKY] += (float)videoanalysis->acc_buffer[i].visible;
+        }
+
+        values[FREEZE] = 100.0 * values[FREEZE] / (width * height);
+        values[LUMA] = 256.0 * values[LUMA] / (width * height);
+        values[DIFF] = 100.0 * values[DIFF] / (width * height);
+        values[BLACK] = 100.0 * values[BLACK] / (width * height);
+        values[BLOCKY] = 100.0 * values[BLOCKY] / (width * height / 64);
 
         /* Emit data */
         if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
@@ -636,7 +683,7 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
 
         /* errors */
         for (int p = 0; p < PARAM_NUMBER; p++) {
-                float par = videoanalysis->values[p];
+                float par = values[p];
                 err_flags_cmp(&(videoanalysis->errors[p]),
                               &(videoanalysis->params_boundary[p]),
                               TRUE,
@@ -700,37 +747,18 @@ shader_create (GstGLContext * context, GstVideoAnalysis * va)
                                                  NULL))) {
                 GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
                                    ("Failed to initialize shader block"), (NULL));
-        }
-        if (!(va->shader_accum =
-              gst_gl_shader_new_link_with_stages(context, &error,
-                                                 gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
-                                                                                 GST_GLSL_VERSION_450,
-                                                                                 GST_GLSL_PROFILE_CORE,
-                                                                                 shader_source_accum),
-                                                 NULL))) {
-                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
-                                   ("Failed to initialize shader accum"), (NULL));
-        }
-        if (va->buffer) {
-                glDeleteBuffers(1, &va->buffer);
-                va->buffer = 0;
-        }
-        glGenBuffers(1, &va->buffer);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->buffer);
-        glBufferData(GL_SHADER_STORAGE_BUFFER,
-                     (va->in_info.width / 8) * (va->in_info.height / 8) * sizeof(struct Accumulator),
-                     NULL, GL_DYNAMIC_COPY);
 
-        if (va->result) {
-                glDeleteBuffers(1, &va->result);
-                va->result = 0;
+        for (int i = 0; i < va->latency; i++) {
+                if (va->buffer[i]) {
+                        glDeleteBuffers(1, &va->buffer[i]);
+                        va->buffer[i] = 0;
+                }
+                glGenBuffers(1, &va->buffer[i]);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->buffer[i]);
+                glBufferData(GL_SHADER_STORAGE_BUFFER,
+                             (va->in_info.width / 8) * (va->in_info.height / 8) * sizeof(struct Accumulator),
+                             NULL, GL_DYNAMIC_COPY);
         }
-        glGenBuffers(1, &va->result);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->result);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(GLfloat),
-                     NULL, GL_DYNAMIC_DRAW);
-
-        g_printf("Create shader\n");
 }
 
 
@@ -741,7 +769,7 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         int width = va->in_info.width;
         int height = va->in_info.height;
         int stride = va->in_info.stride[0];
-        GLfloat * data = NULL;
+        struct Accumulator * data = NULL;
         
         glGetError();
 
@@ -752,22 +780,12 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
                                    0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
         }
 
-        //g_printf("Texture: width %d, width %d, stride %d\n",
-        //         gst_gl_memory_get_texture_width(va->tex),
-        //         width,
-        //         stride);  
         gl->ActiveTexture (GL_TEXTURE0);      
         gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->tex));
         glBindImageTexture(0, gst_gl_memory_get_texture_id (va->tex),
                            0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
         
-        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer);
-
-        //glGenBuffers(1, &result);
-        //glBindBuffer(GL_SHADER_STORAGE_BUFFER, result);
-        // glBufferData(GL_SHADER_STORAGE_BUFFER, 5 * sizeof(float),
-        //             NULL, GL_STREAM_READ);
-        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 11, va->result);
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer[va->buffer_ptr]);
 
         gst_gl_shader_use (va->shader);        
 
@@ -782,7 +800,7 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
 
         glDispatchCompute(width / 8, height / 8, 1);
 
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
         gst_gl_shader_use (va->shader_block);
 
@@ -792,38 +810,27 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
 
         glDispatchCompute(width / 8, height / 8, 1);
         
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-        gst_gl_shader_use (va->shader_accum);
-
-        gst_gl_shader_set_uniform_1i(va->shader_accum, "width", width);
-        gst_gl_shader_set_uniform_1i(va->shader_accum, "height", height);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         
-        glDispatchCompute(1, 1, 1);
+        /* Get prev results */
 
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-        glFlush();
-        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, va->result);
-        //glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->result);
-        //clock_t t = clock();
-        //glGetNamedBufferSubData(va->result, 0, 5 * sizeof(float), data);
-        //data = (GLfloat *)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-        data = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, 5 * sizeof(float), GL_MAP_READ_BIT);
-        //g_print("Result: %f\n", (clock() - t)/(double)CLOCKS_PER_SEC);
+        guint prev = MODULUS(((gint)va->buffer_ptr - va->latency + 1), va->latency);
         
-        //for (int i = 0; i < 5; i++) {
-        //  if (data)
-                //     va->values[0] = data[0];
-        //}
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, va->buffer[prev]);
+        
+        data = glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
+                                0, (width / 8) * (height / 8) * sizeof(struct Accumulator),
+                                GL_MAP_READ_BIT);
+
+        memcpy(va->acc_buffer, data, (width / 8) * (height / 8) * sizeof(struct Accumulator));
 
         /* Cleanup */
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
-        
-        //glDeleteBuffers(1, &result);
+
+        va->buffer_ptr = MODULUS((va->buffer_ptr+1), va->latency);
 
         //g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
         //          va->values[BLOCKY], va->values[LUMA], va->values[BLACK], va->values[DIFF], va->values[FREEZE]);
