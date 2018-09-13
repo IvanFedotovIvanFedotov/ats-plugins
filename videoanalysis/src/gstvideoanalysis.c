@@ -1,19 +1,5 @@
-/* gstvideoanalysis.c
- *
- * Copyright (C) 2016 freyr <sky_rider_93@mail.ru> 
- *
- * This file is free software; you can redistribute it and/or modify it 
- * under the terms of the GNU Lesser General Public License as 
- * published by the Free Software Foundation; either version 3 of the 
- * License, or (at your option) any later version. 
- *
- * This file is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
- * Lesser General Public License for more details. 
- * 
- * You should have received a copy of the GNU General Public License 
- * along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+/*
+ * TODO copyright
  */
 
 #ifndef LGPL_LIC
@@ -25,70 +11,67 @@
 #endif
 
 /**
- * SECTION:element-gstvideoanalysis
+ * SECTION:element-videoanalysis
+ * @title: videoanalysis
  *
- * The videoanalysis element does FIXME stuff.
+ * QoE analysis based on shaders.
  *
- * <refsect2>
- * <title>Example launch line</title>
+ * ## Examples
  * |[
- * gst-launch-1.0 -v fakesrc ! videoanalysis ! FIXME ! fakesink
+ * gst-launch-1.0 videotestsrc ! glupload ! gstvideoanalysis ! glimagesink
  * ]|
- * FIXME Describe what the pipeline does.
- * </refsect2>
+ * FBO (Frame Buffer Object) and GLSL (OpenGL Shading Language) are required.
+ *
  */
-
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
-#include <gst/gst.h>
-#include <gst/video/video.h>
-#include <gst/video/gstvideofilter.h>
-#include <string.h>
-#include <malloc.h>
-#include <glib.h>
+#include <gst/gl/gstglfuncs.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GLES3/gl31.h>
+#include <assert.h>
 #include <math.h>
+#include <time.h>
 
 #include "gstvideoanalysis.h"
-
 #include "analysis.h"
 
-GST_DEBUG_CATEGORY_STATIC (gst_videoanalysis_debug_category);
+#define MODULUS(n,m)                            \
+        ({                                      \
+        __typeof__(n) _n = (n);                 \
+        __typeof__(m) _m = (m);                 \
+        __typeof__(n) res = _n % _m;            \
+        res < 0 ? _m + res : res;               \
+        })
+
 #define GST_CAT_DEFAULT gst_videoanalysis_debug_category
+GST_DEBUG_CATEGORY_STATIC (gst_videoanalysis_debug_category);
 
-/* prototypes */
+#define gst_videoanalysis_parent_class parent_class
 
-static void
-gst_videoanalysis_set_property (GObject * object,
-				guint property_id,
-				const GValue * value,
-				GParamSpec * pspec);
-static void
-gst_videoanalysis_get_property (GObject * object,
-				guint property_id,
-				GValue * value,
-				GParamSpec * pspec);
-static void
-gst_videoanalysis_dispose      (GObject * object);
-static void
-gst_videoanalysis_finalize     (GObject * object);
-
-static gboolean
-gst_videoanalysis_start        (GstBaseTransform * trans);
-static gboolean
-gst_videoanalysis_stop         (GstBaseTransform * trans);
-static gboolean
-gst_videoanalysis_set_info     (GstVideoFilter * filter,
-				GstCaps * incaps,
-				GstVideoInfo * in_info,
-				GstCaps * outcaps,
-				GstVideoInfo * out_info);
-
-static GstFlowReturn
-gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
-				      GstVideoFrame * frame);
+static void gst_videoanalysis_set_property (GObject * object,
+                                            guint property_id,
+                                            const GValue * value,
+                                            GParamSpec * pspec);
+static void gst_videoanalysis_get_property (GObject * object,
+                                            guint property_id,
+                                            GValue * value,
+                                            GParamSpec * pspec);
+static gboolean gst_videoanalysis_start (GstBaseTransform * trans);
+static gboolean gst_videoanalysis_stop  (GstBaseTransform * trans);
+static GstFlowReturn gst_videoanalysis_transform_ip (GstBaseTransform * filter,
+                                                     GstBuffer * inbuf);
+static GstFlowReturn gst_videoanalysis_prepare_output_buffer (GstBaseTransform * filter,
+                                                              GstBuffer * inbuf,
+                                                              GstBuffer ** outbuf);
+static gboolean gst_videoanalysis_set_caps (GstBaseTransform * trans,
+                                            GstCaps * incaps,
+                                            GstCaps * outcaps);
+static gboolean videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * mem);
+//static gboolean gst_gl_base_filter_find_gl_context (GstGLBaseFilter * filter);
 
 /* signals */
 enum
@@ -101,6 +84,7 @@ enum
 enum
 {
         PROP_0,
+        PROP_LATENCY,
         PROP_PERIOD,
         PROP_LOSS,
         PROP_BLACK_PIXEL_LB,
@@ -130,7 +114,6 @@ enum
         PROP_BLOCKY_PEAK,
         PROP_BLOCKY_PEAK_EN,
         PROP_BLOCKY_DURATION,
-        PROP_MARK_BLOCKS,
         LAST_PROP
 };
 
@@ -138,18 +121,13 @@ static guint      signals[LAST_SIGNAL]   = { 0 };
 static GParamSpec *properties[LAST_PROP] = { NULL, };
 
 /* pad templates */
-
-#define VIDEO_SRC_CAPS                                          \
-        GST_VIDEO_CAPS_MAKE("{ I420, NV12, NV21, YV12, IYUV }")
-
-#define VIDEO_SINK_CAPS                                         \
-        GST_VIDEO_CAPS_MAKE("{ I420, NV12, NV21, YV12, IYUV }")
+static const gchar caps_string[] =
+        "video/x-raw(memory:GLMemory),format=(string){I420,NV12,NV21,YV12}";
 
 /* class initialization */
-
 G_DEFINE_TYPE_WITH_CODE (GstVideoAnalysis,
 			 gst_videoanalysis,
-			 GST_TYPE_VIDEO_FILTER,
+			 GST_TYPE_GL_BASE_FILTER,
 			 GST_DEBUG_CATEGORY_INIT (gst_videoanalysis_debug_category,
 						  "videoanalysis", 0,
 						  "debug category for videoanalysis element"));
@@ -157,22 +135,22 @@ G_DEFINE_TYPE_WITH_CODE (GstVideoAnalysis,
 static void
 gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 {
-        GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
+        GObjectClass *gobject_class = (GObjectClass *) klass;
         GstBaseTransformClass *base_transform_class = GST_BASE_TRANSFORM_CLASS (klass);
-        GstVideoFilterClass *video_filter_class = GST_VIDEO_FILTER_CLASS (klass);
+        GstGLBaseFilterClass *base_filter = GST_GL_BASE_FILTER_CLASS(klass);
 
         /* Setting up pads and setting metadata should be moved to
            base_class_init if you intend to subclass this class. */
         gst_element_class_add_pad_template (GST_ELEMENT_CLASS(klass),
-                                            gst_pad_template_new ("src",
-                                                                  GST_PAD_SRC,
-                                                                  GST_PAD_ALWAYS,
-                                                                  gst_caps_from_string (VIDEO_SRC_CAPS)));
-        gst_element_class_add_pad_template (GST_ELEMENT_CLASS(klass),
                                             gst_pad_template_new ("sink",
                                                                   GST_PAD_SINK,
                                                                   GST_PAD_ALWAYS,
-                                                                  gst_caps_from_string (VIDEO_SINK_CAPS)));
+                                                                  gst_caps_from_string (caps_string)));
+        gst_element_class_add_pad_template (GST_ELEMENT_CLASS(klass),
+                                            gst_pad_template_new ("src",
+                                                                  GST_PAD_SRC,
+                                                                  GST_PAD_ALWAYS,
+                                                                  gst_caps_from_string (caps_string)));
 
         gst_element_class_set_static_metadata (GST_ELEMENT_CLASS(klass),
                                                "Gstreamer element for video analysis",
@@ -182,19 +160,24 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 
         gobject_class->set_property = gst_videoanalysis_set_property;
         gobject_class->get_property = gst_videoanalysis_get_property;
-        gobject_class->dispose = gst_videoanalysis_dispose;
-        gobject_class->finalize = gst_videoanalysis_finalize;
-        base_transform_class->start = GST_DEBUG_FUNCPTR (gst_videoanalysis_start);
-        base_transform_class->stop = GST_DEBUG_FUNCPTR (gst_videoanalysis_stop);
-        video_filter_class->set_info = GST_DEBUG_FUNCPTR (gst_videoanalysis_set_info);
-        video_filter_class->transform_frame_ip = GST_DEBUG_FUNCPTR (gst_videoanalysis_transform_frame_ip);
+        base_transform_class->passthrough_on_same_caps = FALSE;
+        //base_transform_class->transform_ip_on_passthrough = TRUE;
+        base_transform_class->start = gst_videoanalysis_start;
+        base_transform_class->stop = gst_videoanalysis_stop;
+        base_transform_class->transform_ip = gst_videoanalysis_transform_ip;
+        base_transform_class->set_caps = gst_videoanalysis_set_caps;
+        base_filter->supported_gl_api = GST_GL_API_OPENGL3;
 
         signals[DATA_SIGNAL] =
                 g_signal_new("data", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
                              G_STRUCT_OFFSET(GstVideoAnalysisClass, data_signal), NULL, NULL,
                              g_cclosure_marshal_generic, G_TYPE_NONE,
                              1, GST_TYPE_BUFFER);
-        
+
+        properties [PROP_LATENCY] =
+                g_param_spec_uint("latency", "Latency",
+                                  "Measurment latency (frame), bigger latency may reduce GPU stalling. 1 - instant measurment, 2 - 1-frame latency, etc.",
+                                  1, MAX_LATENCY, 3, G_PARAM_READWRITE);
         properties [PROP_PERIOD] =
                 g_param_spec_uint("period", "Period",
                                   "Measuring period",
@@ -301,10 +284,6 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
                 g_param_spec_float("blocky_duration", "Blocky duration boundary",
                                    "Blocky err duration",
                                    0., G_MAXFLOAT, 1., G_PARAM_READWRITE);
-        properties [PROP_MARK_BLOCKS] =
-                g_param_spec_boolean("mark_blocks", "Mark_blocks",
-                                     "Mark borders of visible blocks",
-                                     FALSE, G_PARAM_READWRITE);
 
         g_object_class_install_properties(gobject_class, LAST_PROP, properties);
 }
@@ -312,18 +291,31 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 static void
 gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
 {
+        videoanalysis->latency = 3;
+        videoanalysis->buffer_ptr = 0;
+        videoanalysis->acc_buffer = NULL;
+        videoanalysis->shader = NULL;
+        videoanalysis->shader_block = NULL;
+        videoanalysis->tex = NULL;
+        videoanalysis->prev_buffer = NULL;
+        videoanalysis->prev_tex = NULL;
+        videoanalysis->gl_settings_unchecked = TRUE;
+
+        for (int i = 0; i < MAX_LATENCY; i++) {
+                videoanalysis->buffer[i] = 0;
+        }
+
         videoanalysis->period  = 1;
         videoanalysis->loss    = 1.;
         videoanalysis->black_pixel_lb = 16;
         videoanalysis->pixel_diff_lb = 0;
         for (guint i = 0; i < PARAM_NUMBER; i++) {
-                        videoanalysis->params_boundary[i].cont = 1.;
-                        videoanalysis->params_boundary[i].peak = 1.;
-                        videoanalysis->params_boundary[i].cont_en = FALSE;
-                        videoanalysis->params_boundary[i].peak_en = FALSE;
-                        videoanalysis->params_boundary[i].duration = 1.;
+                videoanalysis->params_boundary[i].cont = 1.;
+                videoanalysis->params_boundary[i].peak = 1.;
+                videoanalysis->params_boundary[i].cont_en = FALSE;
+                videoanalysis->params_boundary[i].peak_en = FALSE;
+                videoanalysis->params_boundary[i].duration = 1.;
         }
-        videoanalysis->mark_blocks = FALSE;
         /* private */
         videoanalysis->frame = 0;
         videoanalysis->frames_in_sec = 25;
@@ -332,12 +324,9 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
         for (guint i = 0; i < PARAM_NUMBER; i++) {
                 videoanalysis->cont_err_duration[i] = 0.;
         }
-        
-        videoanalysis->past_buffer = (guint8*)malloc(4096*4096);
-        videoanalysis->blocks = (BLOCK*)malloc(512*512);
 }
 
-void
+static void
 gst_videoanalysis_set_property (GObject * object,
 				guint property_id,
 				const GValue * value,
@@ -348,6 +337,9 @@ gst_videoanalysis_set_property (GObject * object,
         GST_DEBUG_OBJECT (videoanalysis, "set_property");
 
         switch (property_id) {
+        case PROP_LATENCY:
+                videoanalysis->latency = g_value_get_uint(value);
+                break;
         case PROP_PERIOD:
                 videoanalysis->period = g_value_get_uint(value);
                 break;
@@ -435,16 +427,13 @@ gst_videoanalysis_set_property (GObject * object,
         case PROP_BLOCKY_DURATION:
                 videoanalysis->params_boundary[BLOCKY].duration = g_value_get_float(value);
                 break;
-        case PROP_MARK_BLOCKS:
-                videoanalysis->mark_blocks = g_value_get_boolean(value);
-                break;
         default:
                 G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
                 break;
         }
 }
 
-void
+static void
 gst_videoanalysis_get_property (GObject * object,
 				guint property_id,
 				GValue * value,
@@ -455,8 +444,11 @@ gst_videoanalysis_get_property (GObject * object,
         GST_DEBUG_OBJECT (videoanalysis, "get_property");
 
         switch (property_id) {
+        case PROP_LATENCY: 
+                g_value_set_uint(value, videoanalysis->latency);
+                break;
         case PROP_PERIOD: 
-                g_value_set_float(value, videoanalysis->period);
+                g_value_set_uint(value, videoanalysis->period);
                 break;
         case PROP_LOSS: 
                 g_value_set_float(value, videoanalysis->loss);
@@ -542,48 +534,21 @@ gst_videoanalysis_get_property (GObject * object,
         case PROP_BLOCKY_DURATION:
                 g_value_set_float(value, videoanalysis->params_boundary[BLOCKY].duration);
                 break;
-        case PROP_MARK_BLOCKS: 
-                g_value_set_boolean(value, videoanalysis->mark_blocks);
-                break;
         default:
                 G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
                 break;
         }
 }
 
-void
-gst_videoanalysis_dispose (GObject * object)
-{
-        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (object);
-
-        GST_DEBUG_OBJECT (videoanalysis, "dispose");
-
-        G_OBJECT_CLASS (gst_videoanalysis_parent_class)->dispose (object);
-}
-
-void
-gst_videoanalysis_finalize (GObject * object)
-{
-        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (object);
-
-        GST_DEBUG_OBJECT (videoanalysis, "finalize");
-
-        free(videoanalysis->past_buffer);
-        free(videoanalysis->blocks);
-  
-        G_OBJECT_CLASS (gst_videoanalysis_parent_class)->finalize (object);
-}
 
 static gboolean
 gst_videoanalysis_start (GstBaseTransform * trans)
 {
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
 
-        GST_DEBUG_OBJECT (videoanalysis, "start");
-
         videoanalysis->frame = 0;
         
-        return TRUE;
+        return GST_BASE_TRANSFORM_CLASS(parent_class)->start(trans);
 }
 
 static gboolean
@@ -591,44 +556,114 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
 {
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
 
-        GST_DEBUG_OBJECT (videoanalysis, "stop");
-
-        return TRUE;
+        videoanalysis->tex = NULL;
+        gst_buffer_replace(&videoanalysis->prev_buffer, NULL);
+        videoanalysis->prev_tex = NULL;
+        
+        return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
 
+static gboolean
+_find_local_gl_context (GstGLBaseFilter * filter)
+{
+  if (gst_gl_query_local_gl_context (GST_ELEMENT (filter), GST_PAD_SRC,
+          &filter->context))
+    return TRUE;
+  if (gst_gl_query_local_gl_context (GST_ELEMENT (filter), GST_PAD_SINK,
+          &filter->context))
+    return TRUE;
+  return FALSE;
+}
 
 static gboolean
-gst_videoanalysis_set_info (GstVideoFilter * filter,
-			    GstCaps * incaps,
-			    GstVideoInfo * in_info,
-			    GstCaps * outcaps,
-			    GstVideoInfo * out_info)
+gst_videoanalysis_set_caps (GstBaseTransform * trans,
+                            GstCaps * incaps,
+                            GstCaps * outcaps)
 {
-        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (filter);
+        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
 
-        GST_DEBUG_OBJECT (videoanalysis, "set_info");
+        if (!gst_video_info_from_caps (&videoanalysis->in_info, incaps))
+                goto wrong_caps;
+        if (!gst_video_info_from_caps (&videoanalysis->out_info, outcaps))
+                goto wrong_caps;
 
-        videoanalysis->fps_period    = (float) in_info->fps_d / (float) in_info->fps_n;
-        videoanalysis->frames_in_sec = (guint) ceil(in_info->fps_n / in_info->fps_d);
+        videoanalysis->fps_period    = (float) videoanalysis->in_info.fps_d / (float) videoanalysis->in_info.fps_n;
+        videoanalysis->frames_in_sec = (guint) ceil(videoanalysis->in_info.fps_n / videoanalysis->in_info.fps_d);
 
         videoanalysis->frame_limit = (videoanalysis->frames_in_sec * videoanalysis->period);
         param_reset(&videoanalysis->params);
         err_reset(videoanalysis->errors, videoanalysis->frame_limit);
+
+        if (videoanalysis->acc_buffer)
+                free(videoanalysis->acc_buffer);
+
+        videoanalysis->acc_buffer =
+                (struct Accumulator *) malloc((videoanalysis->in_info.width / 8)
+                                              * (videoanalysis->in_info.height / 8)
+                                              * sizeof(struct Accumulator));
+
+        gst_object_replace((GstObject**)&videoanalysis->shader, NULL);
+        gst_object_replace((GstObject**)&videoanalysis->shader_block, NULL);
+
+        if (! _find_local_gl_context(GST_GL_BASE_FILTER(trans))) {
+                GST_WARNING ("Could not find a context");
+                return FALSE;
+        }
         
-        return TRUE;
+        return GST_BASE_TRANSFORM_CLASS(parent_class)->set_caps(trans,incaps,outcaps);
+
+        /* ERRORS */
+wrong_caps:
+        GST_WARNING ("Wrong caps - could not understand input or output caps");
+        return FALSE;
 }
 
-/* transform */
 static GstFlowReturn
-gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
-				      GstVideoFrame * frame)
+gst_videoanalysis_transform_ip (GstBaseTransform * trans,
+                                GstBuffer * inbuf)
 {
-        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (filter);
-        
-        float params[PARAM_NUMBER];
-  
-        GST_DEBUG_OBJECT (videoanalysis, "transform_frame_ip");
+        GstMemory *tex;
+        GstVideoFrame gl_frame;
+        GstGLContext *context = GST_GL_BASE_FILTER (trans)->context;
+        GstGLSyncMeta *sync_meta;
+        GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
+        int         height = videoanalysis->in_info.height;
+        int         width  = videoanalysis->in_info.width;
+        float       values [PARAM_NUMBER];
+        // GstClockTime time = gst_clock_get_time (GST_ELEMENT_CLOCK(trans));
 
+        if (G_UNLIKELY(!gst_pad_is_linked (GST_BASE_TRANSFORM_SRC_PAD(trans))))
+                return GST_FLOW_OK;
+
+        if (!gst_video_frame_map (&gl_frame, &videoanalysis->in_info, inbuf,
+                                  GST_MAP_READ | GST_MAP_GL)) {
+                goto inbuf_error;
+        }
+        
+        /* map[0] corresponds to the Y component of Yuv */
+        tex = gl_frame.map[0].memory;
+        if (!gst_is_gl_memory (tex)) {
+                GST_ERROR_OBJECT (videoanalysis, "Input memory must be GstGLMemory");
+                goto unmap_error;
+        }
+
+        videoanalysis_apply (videoanalysis, GST_GL_MEMORY_CAST (tex));
+
+        for (int i = 0; i < (width * height / 64); i++) {
+                values[FREEZE] += videoanalysis->acc_buffer[i].frozen;
+                values[BLACK] += videoanalysis->acc_buffer[i].black;
+                values[DIFF] += videoanalysis->acc_buffer[i].diff;
+                values[LUMA] += videoanalysis->acc_buffer[i].bright;
+                values[BLOCKY] += (float)videoanalysis->acc_buffer[i].visible;
+        }
+
+        values[FREEZE] = 100.0 * values[FREEZE] / (width * height);
+        values[LUMA] = 256.0 * values[LUMA] / (width * height);
+        values[DIFF] = 100.0 * values[DIFF] / (width * height);
+        values[BLACK] = 100.0 * values[BLACK] / (width * height);
+        values[BLOCKY] = 100.0 * values[BLOCKY] / (width * height / 64);
+
+        /* Emit data */
         if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
                 gint64 tm = g_get_real_time ();
                 param_avg(&videoanalysis->params, (float)(videoanalysis->frame_limit - 1));
@@ -646,20 +681,9 @@ gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
                 videoanalysis->frame += 1;
         }
 
-        /* params */
-        analyse_buffer(frame->data[0],
-                       videoanalysis->past_buffer,
-                       frame->info.stride[0],
-                       frame->info.width,
-                       frame->info.height,
-                       videoanalysis->black_pixel_lb,
-                       videoanalysis->pixel_diff_lb,
-                       videoanalysis->mark_blocks,
-                       videoanalysis->blocks,
-                       params);
         /* errors */
         for (int p = 0; p < PARAM_NUMBER; p++) {
-                float par = params[p];
+                float par = values[p];
                 err_flags_cmp(&(videoanalysis->errors[p]),
                               &(videoanalysis->params_boundary[p]),
                               TRUE,
@@ -669,9 +693,193 @@ gst_videoanalysis_transform_frame_ip (GstVideoFilter * filter,
                 param_add(&videoanalysis->params, p, par);
         }
 
+        gst_video_frame_unmap (&gl_frame);
+        
+        gst_buffer_add_gl_sync_meta (context, inbuf);
+
+        sync_meta = gst_buffer_get_gl_sync_meta (inbuf);
+        if (sync_meta)
+                gst_gl_sync_meta_set_sync_point (sync_meta, context);
+        //GST_BUFFER_PTS(inbuf) += gst_clock_get_time (GST_ELEMENT_CLOCK(trans)) - time;
+        /* Cleanup */
+        gst_buffer_replace (&videoanalysis->prev_buffer, inbuf);
+
         return GST_FLOW_OK;
+                
+unmap_error:
+        gst_video_frame_unmap (&gl_frame);
+inbuf_error:
+        return GST_FLOW_ERROR;
+}
+/*
+  static void
+  fbo_create (GstGLContext * context, GstVideoAnalysis * va)
+  {
+  gint in_width, in_height;
+  in_width = GST_VIDEO_INFO_WIDTH (&va->in_info);
+  in_height = GST_VIDEO_INFO_HEIGHT (&va->in_info);
+  va->fbo = gst_gl_framebuffer_new_with_default_depth (context,
+  in_width,
+  in_height);
+  }
+*/
+
+static void
+shader_create (GstGLContext * context, GstVideoAnalysis * va)
+{
+        GError * error;
+        if (!(va->shader =
+              gst_gl_shader_new_link_with_stages(context, &error,
+                                                 gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
+                                                                                 GST_GLSL_VERSION_450,
+                                                                                 GST_GLSL_PROFILE_CORE,
+                                                                                 shader_source),
+                                                 NULL))) {
+                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
+                                   ("Failed to initialize shader"), (NULL));
+        }
+        if (!(va->shader_block =
+              gst_gl_shader_new_link_with_stages(context, &error,
+                                                 gst_glsl_stage_new_with_string (context, GL_COMPUTE_SHADER,
+                                                                                 GST_GLSL_VERSION_450,
+                                                                                 GST_GLSL_PROFILE_CORE,
+                                                                                 shader_source_block),
+                                                 NULL))) {
+                GST_ELEMENT_ERROR (va, RESOURCE, NOT_FOUND,
+                                   ("Failed to initialize shader block"), (NULL));
+        }
+        for (int i = 0; i < va->latency; i++) {
+                if (va->buffer[i]) {
+                        glDeleteBuffers(1, &va->buffer[i]);
+                        va->buffer[i] = 0;
+                }
+                glGenBuffers(1, &va->buffer[i]);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, va->buffer[i]);
+                glBufferData(GL_SHADER_STORAGE_BUFFER,
+                             (va->in_info.width / 8) * (va->in_info.height / 8) * sizeof(struct Accumulator),
+                             NULL, GL_DYNAMIC_COPY);
+        }
 }
 
+
+static void
+analyse (GstGLContext *context, GstVideoAnalysis * va)
+{
+        const GstGLFuncs * gl = context->gl_vtable;
+        int width = va->in_info.width;
+        int height = va->in_info.height;
+        int stride = va->in_info.stride[0];
+        struct Accumulator * data = NULL;
+        
+        glGetError();
+
+        if (G_LIKELY(va->prev_tex)) {
+                gl->ActiveTexture (GL_TEXTURE0 + 1);
+                gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->prev_tex));
+                glBindImageTexture(0, gst_gl_memory_get_texture_id (va->prev_tex),
+                                   0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+        }
+
+        gl->ActiveTexture (GL_TEXTURE0);      
+        gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->tex));
+        glBindImageTexture(0, gst_gl_memory_get_texture_id (va->tex),
+                           0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
+        
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer[va->buffer_ptr]);
+
+        gst_gl_shader_use (va->shader);        
+
+        GLuint prev_ind = va->prev_tex != 0 ? 1 : 0;
+        gst_gl_shader_set_uniform_1i(va->shader, "tex", 0);
+        gst_gl_shader_set_uniform_1i(va->shader, "tex_prev", prev_ind);
+        gst_gl_shader_set_uniform_1i(va->shader, "width", width);
+        gst_gl_shader_set_uniform_1i(va->shader, "height", height);
+        gst_gl_shader_set_uniform_1i(va->shader, "stride", stride);
+        gst_gl_shader_set_uniform_1i(va->shader, "black_bound", va->black_pixel_lb);
+        gst_gl_shader_set_uniform_1i(va->shader, "freez_bound", va->pixel_diff_lb);
+
+        glDispatchCompute(width / 8, height / 8, 1);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+        gst_gl_shader_use (va->shader_block);
+
+        gst_gl_shader_set_uniform_1i(va->shader_block, "tex", 0);
+        gst_gl_shader_set_uniform_1i(va->shader_block, "width", width);
+        gst_gl_shader_set_uniform_1i(va->shader_block, "height", height);
+
+        glDispatchCompute(width / 8, height / 8, 1);
+        
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        
+        /* Get prev results */
+
+        guint prev = MODULUS(((gint)va->buffer_ptr - va->latency + 1), va->latency);
+        
+        glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, va->buffer[prev]);
+        
+        data = glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
+                                0, (width / 8) * (height / 8) * sizeof(struct Accumulator),
+                                GL_MAP_READ_BIT);
+
+        memcpy(va->acc_buffer, data, (width / 8) * (height / 8) * sizeof(struct Accumulator));
+
+        /* Cleanup */
+        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        va->buffer_ptr = MODULUS((va->buffer_ptr+1), va->latency);
+
+        //g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
+        //          va->values[BLOCKY], va->values[LUMA], va->values[BLACK], va->values[DIFF], va->values[FREEZE]);
+        
+        va->prev_tex = va->tex;
+}
+
+static void
+_check_defaults_ (GstGLContext *context, GstVideoAnalysis * va) {
+        int size, type;
+        
+        glGetInternalformativ(GL_TEXTURE_2D, GL_RED, GL_INTERNALFORMAT_RED_SIZE, 1, &size);
+        glGetInternalformativ(GL_TEXTURE_2D, GL_RED, GL_INTERNALFORMAT_RED_TYPE, 1, &type);
+
+        if (size == 8 && type == GL_UNSIGNED_NORMALIZED) {
+                va->gl_settings_unchecked = FALSE;
+        } else {
+                GST_ERROR("Platform default red representation is not GL_R8");
+                exit(-1);
+        }
+}
+
+static gboolean
+videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
+{
+        GstGLContext *context = GST_GL_BASE_FILTER (va)->context;
+
+        /* Ensure that GL platform defaults meet the expectations */
+        if (G_UNLIKELY(va->gl_settings_unchecked)) {
+                gst_gl_context_thread_add(context, (GstGLContextThreadFunc) _check_defaults_, va);
+        }
+        /* Check texture format */
+        if (G_UNLIKELY(gst_gl_memory_get_texture_format(tex) != GST_GL_RED)) {
+                GST_ERROR("GL texture format should be GL_RED");
+                exit(-1);
+        }
+
+        va->tex = tex;
+
+        /* Compile shader */
+        if (G_UNLIKELY (!va->shader) )
+                gst_gl_context_thread_add(context, (GstGLContextThreadFunc) shader_create, va);
+
+        /* Analyze */
+        gst_gl_context_thread_add(context, (GstGLContextThreadFunc) analyse, va);
+
+        return TRUE;
+}
+   
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
@@ -706,4 +914,3 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
 		   videoanalysis,
 		   "Package for video data analysis",
 		   plugin_init, VERSION, LIC, PACKAGE_NAME, GST_PACKAGE_ORIGIN)
-
