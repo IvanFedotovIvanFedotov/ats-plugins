@@ -663,6 +663,9 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
         values[BLACK] = 100.0 * values[BLACK] / (width * height);
         values[BLOCKY] = 100.0 * values[BLOCKY] / (width * height / 64);
 
+        //g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
+        //          values[BLOCKY], values[LUMA], values[BLACK], values[DIFF], values[FREEZE]);
+
         /* Emit data */
         if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
                 gint64 tm = g_get_real_time ();
@@ -831,9 +834,6 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         glBindTexture(GL_TEXTURE_2D, 0);
 
         va->buffer_ptr = MODULUS((va->buffer_ptr+1), va->latency);
-
-        //g_printf ("Shader Results: [block: %f; luma: %f; black: %f; diff: %f; freeze: %f]\n",
-        //          va->values[BLOCKY], va->values[LUMA], va->values[BLACK], va->values[DIFF], va->values[FREEZE]);
         
         va->prev_tex = va->tex;
 }

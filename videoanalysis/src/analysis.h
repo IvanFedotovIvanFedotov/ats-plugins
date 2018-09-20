@@ -13,20 +13,19 @@ struct Accumulator {
 static const char* shader_source =
         "#version 430\n"
         "#extension GL_ARB_compute_shader : enable\n"
-        "#extension GL_ARB_shader_image_load_store : enable\n"
         "#extension GL_ARB_shader_storage_buffer_object : enable\n"
         "\n"
         "//precision lowp float;\n"
         "\n"
-        "#define WHT_LVL 0.90196078\n"
-        "// 210\n"
-        "#define BLK_LVL 0.15625\n"
-        "// 40\n"
-        "#define WHT_DIFF 0.0234375\n"
-        "// 6\n"
-        "#define GRH_DIFF 0.0078125\n"
-        "// 2\n"
-        "#define KNORM 4.0\n"
+        "#define WHT_LVL 210\n"
+        "// 210 //0.90196078\n"
+        "#define BLK_LVL 40\n"
+        "// 40 //0.15625\n"
+        "#define WHT_DIFF 6\n"
+        "// 6 //0.0234375\n"
+        "#define GRH_DIFF 2\n"
+        "// 2 //0.0078125\n"
+        "#define KNORM 4\n"
         "#define L_DIFF 5\n"
         "\n"
         "#define BLOCK_SIZE 8\n"
@@ -52,64 +51,105 @@ static const char* shader_source =
         "         Noize noize_data [];\n"
         "};\n"
         "\n"
-        "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in; \n"
+        "layout (local_size_x = BLOCK_SIZE, local_size_y = BLOCK_SIZE, local_size_z = 1) in; \n"
         "\n"
-        "float compute_noize (ivec2 pos) {\n"
-        "        float lvl;\n"
-        "        float pix       = imageLoad(tex, pos).r;\n"
-        "        float pix_right = imageLoad(tex, ivec2(pos.x + 1, pos.y)).r;\n"
-        "        float pix_down  = imageLoad(tex, ivec2(pos.x, pos.y + 1)).r;\n"
-        "        /* Noize */\n"
-        "        float res = 0.0;\n"
-        "        if ((pix < WHT_LVL) && (pix > BLK_LVL)) {\n"
-        "                lvl = GRH_DIFF;\n"
-        "        } else {\n"
-        "                lvl = WHT_DIFF;\n"
-        "        }\n"
-        "        if (abs(pix - pix_right) >= lvl) {\n"
-        "                res += 1.0/(8.0*8.0*2.0);\n"
-        "        }\n"
-        "        if (abs(pix - pix_down) >= lvl) {\n"
-        "                res += 1.0/(8.0*8.0*2.0);\n"
-        "        }\n"
-        "        return res;\n"
-        "}\n"
+        "        shared int noize;"
+        "        shared int bright;"
+        "        shared int diff;"
+        "        shared int black;"
+        "        shared int frozen;"
         "\n"
         "void main() {\n"
-        "        uint block_pos = (gl_WorkGroupID.y * (width / BLOCK_SIZE)) + gl_WorkGroupID.x;\n"
-        "        /* Block init */\n"
+        "        uint  block_pos = (gl_WorkGroupID.y * (width / BLOCK_SIZE)) + gl_WorkGroupID.x;\n"
+        "        ivec2 pix_pos   = ivec2(gl_GlobalInvocationID.xy);\n"                      
         "\n"
-        "        noize_data[block_pos].noize = 0.0;\n"
-        "        noize_data[block_pos].black = 0.0;\n"
-        "        noize_data[block_pos].frozen = 0.0;\n"
-        "        noize_data[block_pos].bright = 0.0;\n"
-        "        noize_data[block_pos].diff = 0.0;\n"
-        "        noize_data[block_pos].visible = 0;\n"
-        "        \n"
-        "        for (int i = 0; i < BLOCK_SIZE; i++) {\n"
-        "                for (int j = 0; j < BLOCK_SIZE; j++) {\n"
-        "                        float diff_loc;\n"
-        "                        ivec2 pix_pos = ivec2(gl_WorkGroupID.x * BLOCK_SIZE + i,\n"
-        "                                              gl_WorkGroupID.y * BLOCK_SIZE + j);\n"
-        "                        float pix = imageLoad(tex, pix_pos).r;\n"
-        "                        /* Noize */\n"
-        "                        noize_data[block_pos].noize += compute_noize(pix_pos);\n"
-        "                        /* Brightness */\n"
-        "                        noize_data[block_pos].bright += float(pix);\n"
-        "                        /* Black */\n"
-        "                        if (pix <= float(black_bound / 255.0)) {\n"
-        "                                noize_data[block_pos].black += 1.0;\n"
-        "                        }\n"
-        "                        /* Diff */\n"
-        "                        diff_loc = abs(pix - imageLoad(tex_prev, pix_pos).r);\n"
-        "                        noize_data[block_pos].diff += diff_loc;\n"
-        "                        /* Frozen */\n"
-        "                        if (diff_loc <= float(freez_bound / 255.0)) {\n"
-        "                                noize_data[block_pos].frozen += 1.0;\n"
-        "                        }\n"
-        "                }\n"
+        "        /* init shared*/\n"
+        "        if (gl_LocalInvocationID.xy == ivec2(0,0)) {\n"
+        "             noize = 0;\n"
+        "             bright = 0;\n"
+        "             diff = 0;\n"
+        "             black = 0;\n"
+        "             frozen = 0;\n"
         "        }\n"
-        "}\n";
+        "        memoryBarrierShared();"
+        "        barrier();"
+        "\n"
+        "        int   pix       = int(imageLoad(tex, pix_pos).r * 255);\n"
+        "        int   pix_right = int(imageLoad(tex, ivec2(pix_pos.x + 1, pix_pos.y)).r * 255);\n"
+        "        int   pix_down  = int(imageLoad(tex, ivec2(pix_pos.x, pix_pos.y + 1)).r * 255);\n"
+        "        /* Noize */\n"
+        "        int   lvl = WHT_DIFF;\n"
+        "        if ((pix < WHT_LVL) && (pix > BLK_LVL)) {\n"
+        "              lvl = GRH_DIFF;\n"
+        "        }\n"
+        "        if (abs(pix - pix_right) > lvl) {\n"
+        "            atomicAdd(noize, 1);\n"
+        "        }\n"
+        "        if (abs(pix - pix_down) > lvl) {\n"
+        "            atomicAdd(noize, 1);\n"
+        "        }\n"
+        "        /* Brightness */\n"
+        "        atomicAdd(bright, pix);\n"
+        "        /* Black */\n"
+        "        if (pix <= black_bound) {\n"
+        "            atomicAdd(black, 1);\n"
+        "        }\n"
+        "        /* Diff */\n"
+        "        int   pix_prev = int(imageLoad(tex_prev, pix_pos).r * 255);\n"
+        "        int   diff_loc = abs(pix - pix_prev);\n"
+        "        atomicAdd(diff, diff_loc);\n"
+        "        /* Frozen */\n"
+        "        if (diff_loc <= freez_bound) {\n"
+        "            atomicAdd(frozen, 1);\n"
+        "        }\n"
+        "        memoryBarrierShared();"
+        "        barrier();"
+        "        /* Store results */\n"
+        "        if (gl_LocalInvocationID.xy == ivec2(0,0)) {\n"
+        "            noize_data[block_pos].noize  = float(noize) / (8.0 * 8.0 * 2.0);\n"
+        "            noize_data[block_pos].black  = float(black);\n"
+        "            noize_data[block_pos].frozen = float(frozen);\n"
+        "            noize_data[block_pos].bright = float(bright) / 255.0;\n"
+        "            noize_data[block_pos].diff   = float(diff);\n"
+        "            noize_data[block_pos].visible = 0;\n"
+        "        }\n"    
+        "}\n";                         
+        /* "        for (int i = 0; i < BLOCK_SIZE; i++) {\n" */
+        /* "                for (int j = 0; j < BLOCK_SIZE; j++) {\n" */
+        /* "                        float diff_loc;\n" */
+        /* "                        ivec2 pix_pos = ivec2(gl_WorkGroupID.x * BLOCK_SIZE + i,\n" */
+        /* "                                              gl_WorkGroupID.y * BLOCK_SIZE + j);\n" */
+        /* "                        float pix = imageLoad(tex, pix_pos).r;\n" */
+        /* "                        float pix_right = imageLoad(tex, ivec2(pix_pos.x + 1, pix_pos.y)).r;\n" */
+        /* "                        float pix_down  = imageLoad(tex, ivec2(pix_pos.x, pix_pos.y + 1)).r;\n" */
+        /* "                        /\* Noize *\/\n" */
+        /* "                        float lvl = WHT_DIFF;\n" */
+        /* //"                        if ((pix < WHT_LVL) && (pix > BLK_LVL)) {\n" */
+        /* // "                            lvl = GRH_DIFF;\n" */
+        /* //"                        }\n" */
+        /* "                        if (abs(pix - pix_right) > lvl) {\n" */
+        /* "                            noize_data[block_pos].noize += 1.0/(8.0*8.0*2.0);\n" */
+        /* "                        }\n" */
+        /* "                        if (abs(pix - pix_down) > lvl) {\n" */
+        /* "                            noize_data[block_pos].noize += 1.0/(8.0*8.0*2.0);\n" */
+        /* "                        }\n" */
+        /* //"                        noize_data[block_pos].noize += compute_noize(pix_pos);\n" */
+        /* "                        /\* Brightness *\/\n" */
+        /* "                        noize_data[block_pos].bright += float(pix);\n" */
+        /* "                        /\* Black *\/\n" */
+        /* "                        if (pix <= float(black_bound / 255.0)) {\n" */
+        /* "                                noize_data[block_pos].black += 1.0;\n" */
+        /* "                        }\n" */
+        /* "                        /\* Diff *\/\n" */
+        /* "                        diff_loc = abs(pix - imageLoad(tex_prev, pix_pos).r);\n" */
+        /* "                        noize_data[block_pos].diff += diff_loc;\n" */
+        /* "                        /\* Frozen *\/\n" */
+        /* "                        if (diff_loc <= float(freez_bound / 255.0)) {\n" */
+        /* "                                noize_data[block_pos].frozen += 1.0;\n" */
+        /* "                        }\n" */
+        /* "                }\n" */
+        /* "        }\n" */
+        /* "}\n"; */
 
 static const char* shader_source_block =
         "#version 430\n"
