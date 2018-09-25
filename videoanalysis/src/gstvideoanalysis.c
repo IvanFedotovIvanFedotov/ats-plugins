@@ -35,6 +35,7 @@
 #include <assert.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "gstvideoanalysis.h"
 #include "analysis.h"
@@ -921,7 +922,29 @@ videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
 static void
 gst_videoanalysis_timeout (GstVideoAnalysis * va)
 {
-        g_print("Videoanalysis task");
+        GstClockTime time, timeout_last_clock;
+        sleep(va->timeout);
+        time = gst_clock_get_time (gst_element_get_clock(GST_ELEMENT(va)));
+        //GST_OBJECT_LOCK(va);
+        timeout_last_clock = va->timeout_last_clock;
+        //GST_OBJECT_UNLOCK(va);
+
+        if ((time - timeout_last_clock) > va->timeout_clock) {
+
+                if (! va->timeout_expired ) {
+                        va->timeout_expired = TRUE;
+                        // emit lost event
+                        g_print("Videoanalysis task timeout lost\n");
+                }
+                
+        } else {
+                if ( va->timeout_expired ) {
+                        va->timeout_expired = FALSE;
+                        // emit found event
+                        g_print("Videoanalysis task timeout found\n");
+                }
+        }
+        g_print("Videoanalysis task\n");
 }
    
 static gboolean
