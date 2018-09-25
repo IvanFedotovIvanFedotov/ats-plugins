@@ -934,19 +934,17 @@ gst_videoanalysis_timeout (GstVideoAnalysis * va)
         timeout_last_clock = va->timeout_last_clock;
         //GST_OBJECT_UNLOCK(va);
 
-        if ((time - timeout_last_clock) > va->timeout_clock) {
+        if (G_UNLIKELY ((time - timeout_last_clock) > va->timeout_clock)) {
 
                 if (! va->timeout_expired ) {
                         va->timeout_expired = TRUE;
-                        // emit lost event
-                        g_print("Videoanalysis task timeout lost\n");
+                        g_signal_emit(va, signals[STREAM_LOST_SIGNAL], 0);
                 }
                 
         } else {
                 if ( va->timeout_expired ) {
                         va->timeout_expired = FALSE;
-                        // emit found event
-                        g_print("Videoanalysis task timeout found\n");
+                        g_signal_emit(va, signals[STREAM_FOUND_SIGNAL], 0);
                 }
         }
 }

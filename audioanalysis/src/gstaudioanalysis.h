@@ -48,7 +48,13 @@ typedef struct _GstAudioAnalysisClass GstAudioAnalysisClass;
 struct _GstAudioAnalysis
 {
         GstAudioFilter base_audioanalysis;
+
+        GstClockTimeDiff timeout_clock;
+        GstClockTime     timeout_last_clock;
+        gboolean    timeout_expired;
+        GstTask *   timeout_task;
         /* Public */
+        guint    timeout;
         /* TODO add later: period */
         int      program;
         guint    period;
@@ -75,6 +81,8 @@ struct _GstAudioAnalysisClass
         GstAudioFilterClass base_audioanalysis_class;
 
         void (*data_signal) (GstAudioFilter *filter, GstBuffer* d);
+        void (*stream_lost_signal) (GstAudioFilter *filter);
+        void (*stream_found_signal) (GstAudioFilter *filter);
 };
 
 GType gst_audioanalysis_get_type (void);
