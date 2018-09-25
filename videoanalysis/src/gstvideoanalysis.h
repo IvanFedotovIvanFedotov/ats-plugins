@@ -57,6 +57,11 @@ struct _GstVideoAnalysis
         struct Accumulator * acc_buffer;
 
         /* Frame-related data */
+        GstClockTimeDiff timeout_clock;
+        GstClockTime     timeout_last_clock;
+        gboolean    timeout_expired;
+        GstTask *   timeout_task;
+        
         guint       frame;
         guint       frame_limit;
         float       fps_period;
@@ -66,6 +71,7 @@ struct _GstVideoAnalysis
         Error       errors [PARAM_NUMBER];
         
         /* <public> */
+        guint       timeout;
         guint       latency;
         guint       period;
         gfloat      loss;
@@ -79,6 +85,8 @@ struct _GstVideoAnalysisClass
         GstGLBaseFilterClass parent_class;
 
         void (*data_signal) (GstVideoFilter *filter, GstBuffer* d);
+        void (*stream_lost_signal) (GstVideoFilter *filter);
+        void (*stream_found_signal) (GstVideoFilter *filter);
 };
 
 
