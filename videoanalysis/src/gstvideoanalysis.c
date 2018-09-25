@@ -707,6 +707,11 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
 
         /* Emit data */
         if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
+                // Update timeout clock
+                GST_OBJECT_LOCK(trans);
+                videoanalysis->timeout_last_clock = gst_clock_get_time (GST_ELEMENT_CLOCK(trans));
+                GST_OBJECT_UNLOCK(trans);
+                
                 gint64 tm = g_get_real_time ();
                 param_avg(&videoanalysis->params, (float)(videoanalysis->frame_limit - 1));
                 err_add_timestamp(videoanalysis->errors, tm);
@@ -944,7 +949,6 @@ gst_videoanalysis_timeout (GstVideoAnalysis * va)
                         g_print("Videoanalysis task timeout found\n");
                 }
         }
-        g_print("Videoanalysis task\n");
 }
    
 static gboolean
