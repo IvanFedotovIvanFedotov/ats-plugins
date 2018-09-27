@@ -21,6 +21,7 @@
 
 #include <time.h>
 #include <gst/audio/gstaudiofilter.h>
+#include <stdatomic.h>
 #include "ebur128.h"
 
 #include "audiodata.h"
@@ -49,10 +50,11 @@ struct _GstAudioAnalysis
 {
         GstAudioFilter base_audioanalysis;
 
-        GstClockTimeDiff timeout_clock;
-        GstClockTime     timeout_last_clock;
-        gboolean    timeout_expired;
-        GstTask *   timeout_task;
+        GRecMutex            task_lock;
+        GstClockTimeDiff     timeout_clock;
+        _Atomic GstClockTime timeout_last_clock;
+        gboolean             timeout_expired;
+        GstTask *            timeout_task;
         /* Public */
         guint    timeout;
         /* TODO add later: period */

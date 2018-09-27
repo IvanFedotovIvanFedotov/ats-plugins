@@ -8,6 +8,7 @@
 #include <gst/gl/gl.h>
 #include <gst/gl/gstglbasefilter.h>
 #include <GL/gl.h>
+#include <stdatomic.h>
 
 #include "videodata.h"
 #include "error.h"
@@ -57,10 +58,11 @@ struct _GstVideoAnalysis
         struct Accumulator * acc_buffer;
 
         /* Frame-related data */
-        GstClockTimeDiff timeout_clock;
-        GstClockTime     timeout_last_clock;
-        gboolean    timeout_expired;
-        GstTask *   timeout_task;
+        GRecMutex            task_lock;
+        GstClockTimeDiff     timeout_clock;
+        _Atomic GstClockTime timeout_last_clock;
+        gboolean             timeout_expired;
+        GstTask *            timeout_task;
         
         guint       frame;
         guint       frame_limit;

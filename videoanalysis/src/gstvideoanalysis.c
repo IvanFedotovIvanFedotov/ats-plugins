@@ -575,11 +575,12 @@ gst_videoanalysis_start (GstBaseTransform * trans)
         videoanalysis->frame = 0;
         videoanalysis->timeout_expired = FALSE;
         videoanalysis->timeout_clock = 1000000000 * videoanalysis->timeout;
-        videoanalysis->timeout_last_clock =
-                gst_clock_get_time (gst_element_get_clock (GST_ELEMENT(trans)));
+        atomic_store(&videoanalysis->timeout_last_clock,
+                     gst_clock_get_time (gst_element_get_clock (GST_ELEMENT(trans))));
 
+        g_rec_mutex_init (&videoanalysis->task_lock);
         videoanalysis->timeout_task = gst_task_new ((GstTaskFunction) gst_videoanalysis_timeout, trans, NULL);
-        gst_task_set_lock (videoanalysis->timeout_task, &GST_ELEMENT(trans)->state_lock);
+        gst_task_set_lock (videoanalysis->timeout_task, &videoanalysis->task_lock);
         gst_task_start (videoanalysis->timeout_task);
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->start(trans);
@@ -595,8 +596,10 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
         videoanalysis->prev_tex = NULL;
 
         if (videoanalysis->timeout_task) {
+                gst_task_stop (videoanalysis->timeout_task);
                 gst_task_join (videoanalysis->timeout_task);
-                gst_object_replace(&videoanalysis->timeout_task, NULL);
+                gst_object_replace (&videoanalysis->timeout_task, NULL);
+                g_rec_mutex_clear (&videoanalysis->task_lock);
         }
         
         return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
@@ -708,9 +711,8 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
         /* Emit data */
         if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
                 // Update timeout clock
-                GST_OBJECT_LOCK(trans);
-                videoanalysis->timeout_last_clock = gst_clock_get_time (GST_ELEMENT_CLOCK(trans));
-                GST_OBJECT_UNLOCK(trans);
+                atomic_store(&videoanalysis->timeout_last_clock,
+                             gst_clock_get_time (GST_ELEMENT_CLOCK(trans)));
                 
                 gint64 tm = g_get_real_time ();
                 param_avg(&videoanalysis->params, (float)(videoanalysis->frame_limit - 1));
@@ -930,9 +932,7 @@ gst_videoanalysis_timeout (GstVideoAnalysis * va)
         GstClockTime time, timeout_last_clock;
         sleep(va->timeout);
         time = gst_clock_get_time (gst_element_get_clock(GST_ELEMENT(va)));
-        //GST_OBJECT_LOCK(va);
-        timeout_last_clock = va->timeout_last_clock;
-        //GST_OBJECT_UNLOCK(va);
+        timeout_last_clock = atomic_load(&va->timeout_last_clock);
 
         if (G_UNLIKELY ((time - timeout_last_clock) > va->timeout_clock)) {
 
