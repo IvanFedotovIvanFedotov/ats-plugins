@@ -583,7 +583,7 @@ gst_videoanalysis_start (GstBaseTransform * trans)
         gst_task_set_lock (videoanalysis->timeout_task, &videoanalysis->task_lock);
         gst_task_start (videoanalysis->timeout_task);
         
-        return GST_BASE_TRANSFORM_CLASS(parent_class)->start(trans);
+        return TRUE; //GST_BASE_TRANSFORM_CLASS(parent_class)->start(trans);
 }
 
 static gboolean
@@ -602,7 +602,7 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
                 g_rec_mutex_clear (&videoanalysis->task_lock);
         }
         
-        return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
+        return TRUE; //GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
 
 static gboolean
@@ -930,7 +930,16 @@ static void
 gst_videoanalysis_timeout (GstVideoAnalysis * va)
 {
         GstClockTime time, timeout_last_clock;
-        sleep(va->timeout);
+        static int counter     = 0;
+        
+        sleep(1);
+        if (counter <= va->timeout) {
+                counter += 1;
+                return;
+        } else {
+                counter = 0;
+        }
+        
         time = gst_clock_get_time (gst_element_get_clock(GST_ELEMENT(va)));
         timeout_last_clock = atomic_load(&va->timeout_last_clock);
 
