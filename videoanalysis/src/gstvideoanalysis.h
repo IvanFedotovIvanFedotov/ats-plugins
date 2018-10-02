@@ -8,6 +8,7 @@
 #include <gst/gl/gl.h>
 #include <gst/gl/gstglbasefilter.h>
 #include <GL/gl.h>
+#include <stdatomic.h>
 
 #include "videodata.h"
 #include "error.h"
@@ -57,6 +58,12 @@ struct _GstVideoAnalysis
         struct Accumulator * acc_buffer;
 
         /* Frame-related data */
+        GRecMutex            task_lock;
+        GstClockTimeDiff     timeout_clock;
+        _Atomic GstClockTime timeout_last_clock;
+        gboolean             timeout_expired;
+        GstTask *            timeout_task;
+        
         guint       frame;
         guint       frame_limit;
         float       fps_period;
@@ -66,6 +73,7 @@ struct _GstVideoAnalysis
         Error       errors [PARAM_NUMBER];
         
         /* <public> */
+        guint       timeout;
         guint       latency;
         guint       period;
         gfloat      loss;
@@ -79,6 +87,8 @@ struct _GstVideoAnalysisClass
         GstGLBaseFilterClass parent_class;
 
         void (*data_signal) (GstVideoFilter *filter, GstBuffer* d);
+        void (*stream_lost_signal) (GstVideoFilter *filter);
+        void (*stream_found_signal) (GstVideoFilter *filter);
 };
 
 

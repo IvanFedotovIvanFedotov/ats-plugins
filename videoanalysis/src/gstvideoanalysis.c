@@ -35,6 +35,7 @@
 #include <assert.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "gstvideoanalysis.h"
 #include "analysis.h"
@@ -71,12 +72,15 @@ static gboolean gst_videoanalysis_set_caps (GstBaseTransform * trans,
                                             GstCaps * incaps,
                                             GstCaps * outcaps);
 static gboolean videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * mem);
+static void gst_videoanalysis_timeout (GstVideoAnalysis * va);
 //static gboolean gst_gl_base_filter_find_gl_context (GstGLBaseFilter * filter);
 
 /* signals */
 enum
 {
         DATA_SIGNAL,
+        STREAM_LOST_SIGNAL,
+        STREAM_FOUND_SIGNAL,
         LAST_SIGNAL
 };
 
@@ -84,6 +88,7 @@ enum
 enum
 {
         PROP_0,
+        PROP_TIMEOUT,
         PROP_LATENCY,
         PROP_PERIOD,
         PROP_LOSS,
@@ -173,7 +178,19 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
                              G_STRUCT_OFFSET(GstVideoAnalysisClass, data_signal), NULL, NULL,
                              g_cclosure_marshal_generic, G_TYPE_NONE,
                              1, GST_TYPE_BUFFER);
+        signals[STREAM_LOST_SIGNAL] =
+                g_signal_new("stream-lost", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+                             G_STRUCT_OFFSET(GstVideoAnalysisClass, stream_lost_signal), NULL, NULL,
+                             g_cclosure_marshal_generic, G_TYPE_NONE, 0);
+        signals[STREAM_FOUND_SIGNAL] =
+                g_signal_new("stream-found", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+                             G_STRUCT_OFFSET(GstVideoAnalysisClass, stream_found_signal), NULL, NULL,
+                             g_cclosure_marshal_generic, G_TYPE_NONE, 0);
 
+        properties [PROP_TIMEOUT] =
+                g_param_spec_uint("timeout", "Stream-lost event timeout",
+                                  "Seconds needed for stream-lost being emitted.",
+                                  1, G_MAXUINT, 10, G_PARAM_READWRITE);
         properties [PROP_LATENCY] =
                 g_param_spec_uint("latency", "Latency",
                                   "Measurment latency (frame), bigger latency may reduce GPU stalling. 1 - instant measurment, 2 - 1-frame latency, etc.",
@@ -305,6 +322,9 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
                 videoanalysis->buffer[i] = 0;
         }
 
+        videoanalysis->timeout_task = NULL;
+
+        videoanalysis->timeout = 10;
         videoanalysis->period  = 1;
         videoanalysis->loss    = 1.;
         videoanalysis->black_pixel_lb = 16;
@@ -337,6 +357,9 @@ gst_videoanalysis_set_property (GObject * object,
         GST_DEBUG_OBJECT (videoanalysis, "set_property");
 
         switch (property_id) {
+        case PROP_TIMEOUT:
+                videoanalysis->timeout = g_value_get_uint(value);
+                break;
         case PROP_LATENCY:
                 videoanalysis->latency = g_value_get_uint(value);
                 break;
@@ -444,6 +467,9 @@ gst_videoanalysis_get_property (GObject * object,
         GST_DEBUG_OBJECT (videoanalysis, "get_property");
 
         switch (property_id) {
+        case PROP_TIMEOUT: 
+                g_value_set_uint(value, videoanalysis->timeout);
+                break;
         case PROP_LATENCY: 
                 g_value_set_uint(value, videoanalysis->latency);
                 break;
@@ -547,8 +573,17 @@ gst_videoanalysis_start (GstBaseTransform * trans)
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
 
         videoanalysis->frame = 0;
+        videoanalysis->timeout_expired = FALSE;
+        videoanalysis->timeout_clock = 1000000000 * videoanalysis->timeout;
+        atomic_store(&videoanalysis->timeout_last_clock,
+                     gst_clock_get_time (gst_element_get_clock (GST_ELEMENT(trans))));
+
+        g_rec_mutex_init (&videoanalysis->task_lock);
+        videoanalysis->timeout_task = gst_task_new ((GstTaskFunction) gst_videoanalysis_timeout, trans, NULL);
+        gst_task_set_lock (videoanalysis->timeout_task, &videoanalysis->task_lock);
+        gst_task_start (videoanalysis->timeout_task);
         
-        return GST_BASE_TRANSFORM_CLASS(parent_class)->start(trans);
+        return TRUE; //GST_BASE_TRANSFORM_CLASS(parent_class)->start(trans);
 }
 
 static gboolean
@@ -559,8 +594,15 @@ gst_videoanalysis_stop (GstBaseTransform * trans)
         videoanalysis->tex = NULL;
         gst_buffer_replace(&videoanalysis->prev_buffer, NULL);
         videoanalysis->prev_tex = NULL;
+
+        if (videoanalysis->timeout_task) {
+                gst_task_stop (videoanalysis->timeout_task);
+                gst_task_join (videoanalysis->timeout_task);
+                gst_object_replace (&videoanalysis->timeout_task, NULL);
+                g_rec_mutex_clear (&videoanalysis->task_lock);
+        }
         
-        return GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
+        return TRUE; //GST_BASE_TRANSFORM_CLASS(parent_class)->stop(trans);
 }
 
 static gboolean
@@ -668,6 +710,10 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
 
         /* Emit data */
         if (videoanalysis->frame >= (videoanalysis->frame_limit - 1)) {
+                // Update timeout clock
+                atomic_store(&videoanalysis->timeout_last_clock,
+                             gst_clock_get_time (GST_ELEMENT_CLOCK(trans)));
+                
                 gint64 tm = g_get_real_time ();
                 param_avg(&videoanalysis->params, (float)(videoanalysis->frame_limit - 1));
                 err_add_timestamp(videoanalysis->errors, tm);
@@ -878,6 +924,38 @@ videoanalysis_apply (GstVideoAnalysis * va, GstGLMemory * tex)
         gst_gl_context_thread_add(context, (GstGLContextThreadFunc) analyse, va);
 
         return TRUE;
+}
+
+static void
+gst_videoanalysis_timeout (GstVideoAnalysis * va)
+{
+        GstClockTime time, timeout_last_clock;
+        static int counter     = 0;
+        
+        sleep(1);
+        if (counter <= va->timeout) {
+                counter += 1;
+                return;
+        } else {
+                counter = 0;
+        }
+        
+        time = gst_clock_get_time (gst_element_get_clock(GST_ELEMENT(va)));
+        timeout_last_clock = atomic_load(&va->timeout_last_clock);
+
+        if (G_UNLIKELY ((time - timeout_last_clock) > va->timeout_clock)) {
+
+                if (! va->timeout_expired ) {
+                        va->timeout_expired = TRUE;
+                        g_signal_emit(va, signals[STREAM_LOST_SIGNAL], 0);
+                }
+                
+        } else {
+                if ( va->timeout_expired ) {
+                        va->timeout_expired = FALSE;
+                        g_signal_emit(va, signals[STREAM_FOUND_SIGNAL], 0);
+                }
+        }
 }
    
 static gboolean

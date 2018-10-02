@@ -21,6 +21,7 @@
 
 #include <time.h>
 #include <gst/audio/gstaudiofilter.h>
+#include <stdatomic.h>
 #include "ebur128.h"
 
 #include "audiodata.h"
@@ -41,14 +42,23 @@ G_BEGIN_DECLS
         (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_AUDIOANALYSIS))
 #define GST_IS_AUDIOANALYSIS_CLASS(obj)                                 \
         (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_AUDIOANALYSIS))
+#define GST_AUDIOANALYSIS_GET_CLASS(obj)                                \
+        (G_TYPE_INSTANCE_GET_CLASS((obj),GST_TYPE_AUDIOANALYSIS,GstAudioAnalysisClass))
 
 typedef struct _GstAudioAnalysis GstAudioAnalysis;
 typedef struct _GstAudioAnalysisClass GstAudioAnalysisClass;
 
 struct _GstAudioAnalysis
 {
-        GstAudioFilter base_audioanalysis;
+        GstAudioFilter parent;
+
+        GRecMutex            task_lock;
+        GstClockTimeDiff     timeout_clock;
+        _Atomic GstClockTime timeout_last_clock;
+        gboolean             timeout_expired;
+        GstTask *            timeout_task;
         /* Public */
+        guint    timeout;
         /* TODO add later: period */
         int      program;
         guint    period;
@@ -72,9 +82,11 @@ struct _GstAudioAnalysis
 
 struct _GstAudioAnalysisClass
 {
-        GstAudioFilterClass base_audioanalysis_class;
+        GstAudioFilterClass parent_class;
 
         void (*data_signal) (GstAudioFilter *filter, GstBuffer* d);
+        void (*stream_lost_signal) (GstAudioFilter *filter);
+        void (*stream_found_signal) (GstAudioFilter *filter);
 };
 
 GType gst_audioanalysis_get_type (void);
