@@ -671,7 +671,7 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
         int         height = videoanalysis->in_info.height;
         int         width  = videoanalysis->in_info.width;
-        float       values [PARAM_NUMBER];
+        float       values [PARAM_NUMBER] = { 0 };
         // GstClockTime time = gst_clock_get_time (GST_ELEMENT_CLOCK(trans));
 
         if (G_UNLIKELY(!gst_pad_is_linked (GST_BASE_TRANSFORM_SRC_PAD(trans))))
@@ -698,10 +698,9 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
                 values[LUMA] += videoanalysis->acc_buffer[i].bright;
                 values[BLOCKY] += (float)videoanalysis->acc_buffer[i].visible;
         }
-
         values[FREEZE] = 100.0 * values[FREEZE] / (width * height);
-        values[LUMA] = 256.0 * values[LUMA] / (width * height);
-        values[DIFF] = 100.0 * values[DIFF] / (width * height);
+        values[LUMA] = 255.0 * values[LUMA] / (width * height);
+        values[DIFF] = values[DIFF] / (width * height);
         values[BLACK] = 100.0 * values[BLACK] / (width * height);
         values[BLOCKY] = 100.0 * values[BLOCKY] / (width * height / 64);
 
@@ -823,10 +822,10 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         glGetError();
 
         if (G_LIKELY(va->prev_tex)) {
-                gl->ActiveTexture (GL_TEXTURE0 + 1);
+                gl->ActiveTexture (GL_TEXTURE1);
                 gl->BindTexture (GL_TEXTURE_2D, gst_gl_memory_get_texture_id (va->prev_tex));
-                glBindImageTexture(0, gst_gl_memory_get_texture_id (va->prev_tex),
-                                   0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+                glBindImageTexture(1, gst_gl_memory_get_texture_id (va->prev_tex),
+                                   0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
         }
 
         gl->ActiveTexture (GL_TEXTURE0);      
@@ -846,7 +845,7 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         gst_gl_shader_set_uniform_1i(va->shader, "stride", stride);
         gst_gl_shader_set_uniform_1i(va->shader, "black_bound", va->black_pixel_lb);
         gst_gl_shader_set_uniform_1i(va->shader, "freez_bound", va->pixel_diff_lb);
-
+        
         glDispatchCompute(width / 8, height / 8, 1);
 
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
@@ -863,10 +862,11 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
         
         /* Get prev results */
 
-        guint prev = MODULUS(((gint)va->buffer_ptr - va->latency + 1), va->latency);
+        guint prev = MODULUS(((int)va->buffer_ptr - (int)va->latency + 1), (int)va->latency);
         
         glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, va->buffer[prev]);
-        
+        //glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, va->buffer[prev],
+        //                  0, (width / 8) * (height / 8) * sizeof(struct Accumulator));
         data = glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
                                 0, (width / 8) * (height / 8) * sizeof(struct Accumulator),
                                 GL_MAP_READ_BIT);
