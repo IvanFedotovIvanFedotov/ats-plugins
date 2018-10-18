@@ -61,6 +61,7 @@ static void gst_videoanalysis_get_property (GObject * object,
                                             guint property_id,
                                             GValue * value,
                                             GParamSpec * pspec);
+static void gst_videoanalysis_finalize (GObject *object);
 static gboolean gst_videoanalysis_start (GstBaseTransform * trans);
 static gboolean gst_videoanalysis_stop  (GstBaseTransform * trans);
 static GstFlowReturn gst_videoanalysis_transform_ip (GstBaseTransform * filter,
@@ -165,6 +166,7 @@ gst_videoanalysis_class_init (GstVideoAnalysisClass * klass)
 
         gobject_class->set_property = gst_videoanalysis_set_property;
         gobject_class->get_property = gst_videoanalysis_get_property;
+        gobject_class->finalize     = gst_videoanalysis_finalize;
         base_transform_class->passthrough_on_same_caps = FALSE;
         //base_transform_class->transform_ip_on_passthrough = TRUE;
         base_transform_class->start = gst_videoanalysis_start;
@@ -344,6 +346,16 @@ gst_videoanalysis_init (GstVideoAnalysis *videoanalysis)
         for (guint i = 0; i < PARAM_NUMBER; i++) {
                 videoanalysis->cont_err_duration[i] = 0.;
         }
+}
+
+static void
+gst_videoanalysis_finalize(GObject *object)
+{
+        GstGLContext *context = GST_GL_BASE_FILTER (object)->context;
+        if (context)
+                gst_object_unref(context);
+        
+        G_OBJECT_CLASS (parent_class)->finalize(object);
 }
 
 static void
@@ -590,10 +602,14 @@ static gboolean
 gst_videoanalysis_stop (GstBaseTransform * trans)
 {
         GstVideoAnalysis *videoanalysis = GST_VIDEOANALYSIS (trans);
-
+        GstGLContext *context = GST_GL_BASE_FILTER (videoanalysis)->context;
+        
         videoanalysis->tex = NULL;
         gst_buffer_replace(&videoanalysis->prev_buffer, NULL);
         videoanalysis->prev_tex = NULL;
+
+        gst_object_unref(videoanalysis->shader);
+        gst_object_unref(videoanalysis->shader_block);
 
         if (videoanalysis->timeout_task) {
                 gst_task_stop (videoanalysis->timeout_task);
@@ -643,9 +659,6 @@ gst_videoanalysis_set_caps (GstBaseTransform * trans,
                 (struct Accumulator *) malloc((videoanalysis->in_info.width / 8)
                                               * (videoanalysis->in_info.height / 8)
                                               * sizeof(struct Accumulator));
-
-        gst_object_replace((GstObject**)&videoanalysis->shader, NULL);
-        gst_object_replace((GstObject**)&videoanalysis->shader_block, NULL);
 
         if (! _find_local_gl_context(GST_GL_BASE_FILTER(trans))) {
                 GST_WARNING ("Could not find a context");
@@ -743,11 +756,6 @@ gst_videoanalysis_transform_ip (GstBaseTransform * trans,
 
         gst_video_frame_unmap (&gl_frame);
         
-        gst_buffer_add_gl_sync_meta (context, inbuf);
-
-        sync_meta = gst_buffer_get_gl_sync_meta (inbuf);
-        if (sync_meta)
-                gst_gl_sync_meta_set_sync_point (sync_meta, context);
         //GST_BUFFER_PTS(inbuf) += gst_clock_get_time (GST_ELEMENT_CLOCK(trans)) - time;
         /* Cleanup */
         gst_buffer_replace (&videoanalysis->prev_buffer, inbuf);
@@ -834,8 +842,8 @@ analyse (GstGLContext *context, GstVideoAnalysis * va)
                            0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
         
         glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 10, va->buffer[va->buffer_ptr]);
-
-        gst_gl_shader_use (va->shader);        
+        
+        gst_gl_shader_use (va->shader);
 
         GLuint prev_ind = va->prev_tex != 0 ? 1 : 0;
         gst_gl_shader_set_uniform_1i(va->shader, "tex", 0);
