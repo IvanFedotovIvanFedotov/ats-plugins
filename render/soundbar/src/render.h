@@ -100,7 +100,7 @@ static inline gdouble * render (struct state * state,
   gint fps  = vi->fps;
   gint channels = ai->channels;
   gint size     = amap.size / sizeof (gint16);
-  guint16 samples_per_ch = size / channels;
+  gdouble samples_per_ch = size / channels;
   guint64 sum [MAX_CHANNEL_N] = { 0 };
 
   /* making transparent im */
@@ -131,7 +131,7 @@ static inline gdouble * render (struct state * state,
 
     gdouble vol = 0.0;
 
-    gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / (gdouble)UINT16_MAX ;
+    gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / (gdouble)INT16_MAX ;
 
     if (new_vol > vol) {
             vol = new_vol;
