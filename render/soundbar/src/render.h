@@ -1,5 +1,6 @@
 #include "gstsoundbar.h"
 #include <math.h>
+#include <stdint.h>
 // BGRA ABGR
 static const guint32 red     = 0xff0000ff;
 static const guint32 orange  = 0xff00a5ff;
@@ -94,9 +95,13 @@ static inline gdouble * render (struct state * state,
                                 gint max_channel) {
 
   gdouble levels;
-  guint16 *data_16 = (guint16 *)amap.data;
+  gint16 *data_16 = (gint16 *)amap.data;
   guint16 channel_width;
   gint fps  = vi->fps;
+  gint channels = ai->channels;
+  gint size     = amap.size / sizeof (gint16);
+  gint16 samples_per_ch = size / channels;
+  gint64 sum [MAX_CHANNEL_N] = { 0 };
 
   /* making transparent im */
   for (guint i = 0; i < vi->height * vi->width; i++) {
@@ -109,38 +114,35 @@ static inline gdouble * render (struct state * state,
   hor = horizontal ? vi->height : vi->width;
   vert = horizontal ? vi->width : vi->height;
 
-  if ((hor - 2 * (ai->channels - 1)) / ai->channels > (channel_width1 - 2) &&
+  if ((hor - 2 * (channels - 1)) / channels > (channel_width1 - 2) &&
       (channel_width1 - 2) > 0) {
     channel_width = (channel_width1 - 2);
   }
   else {
-    channel_width = floor ((hor - 2 * (ai->channels - 1)) / ai->channels);
+    channel_width = floor ((hor - 2 * (channels - 1)) / channels);
   }
   levels = floor(vert / lvl_height);
 
-  for (gint ch = 0; ch < (ai->channels); ch++) {
+  for (int i = 0; i < size; i++) {
+          sum[i % channels] += abs(data_16[i]);
+  }
+
+  for (gint ch = 0; ch < channels; ch++) {
 
     gdouble vol = 0.0;
-    guint64 sum = 0;
-    guint16 num = 0;
 
-    for (gint k = ch; k < amap.size; k = k + ai->channels) {
-      sum += (guint16)data_16[k];
-      num ++;
-    }
-    if (num > 0) {
-      gdouble new_vol = (gdouble)(sum / num) / 65536.0;
-      if (new_vol > vol) {
-	vol = new_vol;
-      }
+    gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / (gdouble)UINT16_MAX ;
+
+    if (new_vol > vol) {
+            vol = new_vol;
     }
     gdouble s = 0.1 / (gdouble)fps;
 
     /* rendering part */
     
-    guint16 l_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
+    guint16 l_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
       channel_width * ch + ch * 2;
-    guint16 r_b = (hor - channel_width * (ai->channels) - 2 * (ai->channels)) / 2 +
+    guint16 r_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
       channel_width * (ch + 1) + ch * 2;
     guint8 loudness = rint(vol * levels);
 
