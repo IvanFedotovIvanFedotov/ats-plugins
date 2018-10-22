@@ -56,7 +56,7 @@ static GstStaticPadTemplate gst_soundbar_sink_template =
                                  GST_PAD_SINK,
                                  GST_PAD_ALWAYS,
                                  GST_STATIC_CAPS ("audio/x-raw, "
-                                                  "format = (string) " GST_AUDIO_NE (S16) ", "
+                                                  "format = (string) " GST_AUDIO_NE (U16) ", "
                                                   "layout = (string) interleaved, "
                                                   "rate = (int) [ 8000, 96000 ]")
                                          );
