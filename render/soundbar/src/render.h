@@ -137,8 +137,8 @@ static inline gdouble * render (struct state * state,
                 for (gint samp = ch + measurable;
                      samp <= size - measurable;
                      samp += channels * (measurable / 2)) {
-                        gint sum_2 = 0;
-                        gint num_2 = 0;
+                        gint64 sum_2 = 0;
+                        gint16 num_2 = 0;
                         gdouble vol_2 = 0.0;
                         for (gint i = samp - measurable * channels;
                              i <= samp + measurable * channels;
@@ -148,7 +148,7 @@ static inline gdouble * render (struct state * state,
                                         num_2 ++;
                                 }
                         }
-                        vol_2 = ((gdouble) sum_2 / num_2) / 65536;
+                        vol_2 = ((gdouble)(sum_2 / num_2)) / 65536.0;
                         if (vol_2 > vol) {
                                 vol = vol_2;
                         }
