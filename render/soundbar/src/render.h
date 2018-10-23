@@ -1,6 +1,7 @@
 #include "gstsoundbar.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 // BGRA ABGR
 static const guint32 red     = 0xff0000ff;
 static const guint32 orange  = 0xff00a5ff;
@@ -92,85 +93,106 @@ static inline gdouble * render (struct state * state,
                                 gdouble * peaks,
                                 guint8 channel_width1,
                                 gdouble horizontal,
-                                gint max_channel) {
+                                gint max_channel,
+                                gint rate) {
 
-  gdouble levels;
-  gint16 *data_16 = (gint16 *)amap.data;
-  guint16 channel_width;
-  gint fps  = vi->fps;
-  gint channels = ai->channels;
-  gint size     = amap.size / sizeof (gint16);
-  gdouble samples_per_ch = size / channels;
-  guint64 sum [MAX_CHANNEL_N] = { 0 };
+        gdouble levels;
+        gint16 *data_16 = (gint16 *)amap.data;
+        guint16 channel_width;
+        gint fps  = vi->fps;
+        gint channels = ai->channels;
+        gint size     = amap.size / sizeof (gint16);
+        gdouble samples_per_ch = size / channels;
+        guint64 sum [MAX_CHANNEL_N] = { 0 };
+        gint measurable = rate / 400;
 
-  /* making transparent im */
-  for (guint i = 0; i < vi->height * vi->width; i++) {
-    vdata[i] = 0xff000000 || vdata[i];
-  }
+        /* making transparent im */
+        for (guint i = 0; i < vi->height * vi->width; i++) {
+                vdata[i] = 0xff000000 || vdata[i];
+        }
 
-  /* calculations part */
+        /* calculations part */
 
-  guint16 hor, vert;
-  hor = horizontal ? vi->height : vi->width;
-  vert = horizontal ? vi->width : vi->height;
+        guint16 hor, vert;
+        hor = horizontal ? vi->height : vi->width;
+        vert = horizontal ? vi->width : vi->height;
 
-  if ((hor - 2 * (channels - 1)) / channels > (channel_width1 - 2) &&
-      (channel_width1 - 2) > 0) {
-    channel_width = (channel_width1 - 2);
-  }
-  else {
-    channel_width = floor ((hor - 2 * (channels - 1)) / channels);
-  }
-  levels = floor(vert / lvl_height);
+        if ((hor - 2 * (channels - 1)) / channels > (channel_width1 - 2) &&
+            (channel_width1 - 2) > 0) {
+                channel_width = (channel_width1 - 2);
+        }
+        else {
+                channel_width = floor ((hor - 2 * (channels - 1)) / channels);
+        }
+        levels = floor(vert / lvl_height);
 
-  for (int i = 0; i < size; i++) {
-          sum[i % channels] += data_16[i];
-  }
+        for (int i = 0; i < size; i++) {
+                sum[i % channels] += 32768 + data_16[i];
+        }
 
-  for (gint ch = 0; ch < channels; ch++) {
+        for (gint ch = 0; ch < channels; ch++) {
 
-    gdouble vol = 0.0;
+                gdouble vol = 0.0;
 
-    gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / (gdouble)INT16_MAX ;
+                for (gint samp = ch; samp <= size; samp += channels) {
+                        gint sum_2 = 0;
+                        gint num_2 = 0;
+                        gdouble vol_2 = 0.0;
+                        for (gint i = samp - measurable * channels;
+                             i <= samp + measurable * channels;
+                             i += channels) {
+                                if (i >= 0 && i <= size) {
+                                        sum_2 += data_16[i] + 32768;
+                                        num_2 ++;
+                                }
+                        }
+                        vol_2 = ((gdouble) sum_2 / num_2) / 65536;
+                        if (vol_2 > vol) {
+                                vol = vol_2;
+                        }
+                }
+                g_print ("%f\n", vol);
 
-    if (new_vol > vol) {
-            vol = new_vol;
-    }
-    gdouble s = 0.1 / (gdouble)fps;
+                /* gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / 65536.0;
 
-    /* rendering part */
+                if (new_vol > vol) {
+                        vol = new_vol;
+                } */
+                gdouble s = 0.1 / (gdouble)fps;
+
+                /* rendering part */
     
-    guint16 l_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
-      channel_width * ch + ch * 2;
-    guint16 r_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
-      channel_width * (ch + 1) + ch * 2;
-    guint8 loudness = rint(vol * levels);
+                guint16 l_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
+                        channel_width * ch + ch * 2;
+                guint16 r_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
+                        channel_width * (ch + 1) + ch * 2;
+                guint8 loudness = rint(vol * levels);
 
-    if (ch < max_channel)
-      {
-	if (peaks[ch] <= vol) {
-	  peaks[ch] = vol;
-	}
-	else {
-	  peaks[ch] = peaks[ch] - s;
-	}
+                if (ch < max_channel)
+                {
+                        if (peaks[ch] <= vol) {
+                                peaks[ch] = vol;
+                        }
+                        else {
+                                peaks[ch] = peaks[ch] - s;
+                        }
 
-	if (horizontal) {
-	  horizontal_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
-	}
-	else {
-	  vertical_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
-	}
-      }
-    else
-      {
-	if (horizontal) {
-	  horizontal_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
-	}
-	else {
-	  vertical_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
-	}
-      }
-  }
-  return 0;
+                        if (horizontal) {
+                                horizontal_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
+                        }
+                        else {
+                                vertical_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
+                        }
+                }
+                else
+                {
+                        if (horizontal) {
+                                horizontal_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
+                        }
+                        else {
+                                vertical_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
+                        }
+                }
+        }
+        return 0;
 }

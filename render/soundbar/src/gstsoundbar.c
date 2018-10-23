@@ -155,7 +155,8 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
                 peaks,
                 channel_width,
                 horizontal,
-                MAX_CHANNEL_N);
+                MAX_CHANNEL_N,
+                rate);
         gst_buffer_unmap (audio, &amap);
 
         return TRUE;
