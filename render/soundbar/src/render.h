@@ -16,24 +16,24 @@ static const guint32 transparent_black = 0x00000000;
 static const guint8 lvl_height = 5;  /* soundbar level height in px */
 
 static inline guint32 colour (gdouble level) {
-  /* receives the index of soundbar level and returns its color*/
-  if (level < 0.2) {
-    return green;
-  }
-  else if (level < 0.4) {
-    return l_green;
-  }
-  else if (level < 0.6) {
-    return yellow;
-  }
-  else if (level < 0.8) {
-    return orange;
-  }
-  else if (level < 1.0) {
-    return red;
-  }
-  else
-    return transparent_black;
+        /* receives the index of soundbar level and returns its color*/
+        if (level < 0.2) {
+                return green;
+        }
+        else if (level < 0.4) {
+                return l_green;
+        }
+        else if (level < 0.6) {
+                return yellow;
+        }
+        else if (level < 0.8) {
+                return orange;
+        }
+        else if (level < 1.0) {
+                return red;
+        }
+        else
+                return transparent_black;
 }
 
 static inline void horizontal_rendering (struct video_info * vi,
@@ -43,20 +43,20 @@ static inline void horizontal_rendering (struct video_info * vi,
                                          guint16 r_b,
                                          gdouble levels,
                                          guint8 loudness) {
-  for (gint h = l_b; h < r_b; h++) {
-    if (peak > 0.0) {
-      gint num;
-      num = h * (vi->width) + ((vi->width) * peak);
-      vdata[num] = white;
-    }
+        for (gint h = l_b; h < r_b; h++) {
+                if (peak > 0.0) {
+                        gint num;
+                        num = h * (vi->width) + ((vi->width) * peak);
+                        vdata[num] = white;
+                }
 
-    for (gint i = 1; i <= loudness; i++) {
-      for (gint w = lvl_height * (levels - i) + 1; w < lvl_height * (levels - i + 1) - 1; w++) {
-        vdata[vi->width - w + (vi->width) * h] = colour (i / levels);
-      }
-    }
-  }
-  return;
+                for (gint i = 1; i <= loudness; i++) {
+                        for (gint w = lvl_height * (levels - i) + 1; w < lvl_height * (levels - i + 1) - 1; w++) {
+                                vdata[vi->width - w + (vi->width) * h] = colour (i / levels);
+                        }
+                }
+        }
+        return;
 }
 
 static inline void vertical_rendering (struct video_info * vi,
@@ -66,23 +66,23 @@ static inline void vertical_rendering (struct video_info * vi,
                                        guint16 r_b,
                                        gdouble levels,
                                        guint8 loudness) {
-  for (gint h = l_b; h < r_b; h++) {
-    if (peak > 0.0)
-      {
-        guint16 peak_lvl;
-        gint num;
-        peak_lvl = lvl_height * (1 - peak) * levels;
-        num = h + (vi->width) * peak_lvl;
-        vdata[num] = white;
-      }
+        for (gint h = l_b; h < r_b; h++) {
+                if (peak > 0.0)
+                {
+                        guint16 peak_lvl;
+                        gint num;
+                        peak_lvl = lvl_height * (1 - peak) * levels;
+                        num = h + (vi->width) * peak_lvl;
+                        vdata[num] = white;
+                }
 
-    for (gint i = 1; i <= loudness; i++) {
-      for (gint w = lvl_height * (levels - i) + 1; w < lvl_height * (levels - i + 1) - 1; w++) {
-        vdata[h + (vi->width) * w] = colour (i / levels);
-      }
-    }
-  }
-  return;
+                for (gint i = 1; i <= loudness; i++) {
+                        for (gint w = lvl_height * (levels - i) + 1; w < lvl_height * (levels - i + 1) - 1; w++) {
+                                vdata[h + (vi->width) * w] = colour (i / levels);
+                        }
+                }
+        }
+        return;
 }
 
 static inline gdouble * render (struct state * state,
@@ -104,7 +104,7 @@ static inline gdouble * render (struct state * state,
         gint size     = amap.size / sizeof (gint16);
 /*        gdouble samples_per_ch = size / channels; */
         guint64 sum [MAX_CHANNEL_N] = { 0 };
-        gint measurable = rate / 400;
+        gint measurable = (rate / channels) / 400;
 
         /* making transparent im */
         for (guint i = 0; i < vi->height * vi->width; i++) {
@@ -133,10 +133,13 @@ static inline gdouble * render (struct state * state,
         for (gint ch = 0; ch < channels; ch++) {
 
                 gdouble vol = 0.0;
-
+                gint step = 1;
+                if (measurable / 2 > 1) {
+                        step = measurable / 2;
+                }
                 for (gint samp = ch + measurable;
                      samp <= size - measurable;
-                     samp += channels * (measurable / 2)) {
+                     samp += channels * step) {
                         gint64 sum_2 = 0;
                         gint16 num_2 = 0;
                         gdouble vol_2 = 0.0;
@@ -156,9 +159,9 @@ static inline gdouble * render (struct state * state,
 
                 /* gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / 65536.0;
 
-                if (new_vol > vol) {
-                        vol = new_vol;
-                } */
+                   if (new_vol > vol) {
+                   vol = new_vol;
+                   } */
                 gdouble s = 0.1 / (gdouble)fps;
 
                 /* rendering part */
