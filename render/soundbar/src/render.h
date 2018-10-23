@@ -102,7 +102,7 @@ static inline gdouble * render (struct state * state,
         gint fps  = vi->fps;
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
-        gdouble samples_per_ch = size / channels;
+/*        gdouble samples_per_ch = size / channels; */
         guint64 sum [MAX_CHANNEL_N] = { 0 };
         gint measurable = rate / 400;
 
@@ -134,7 +134,9 @@ static inline gdouble * render (struct state * state,
 
                 gdouble vol = 0.0;
 
-                for (gint samp = ch; samp <= size; samp += channels) {
+                for (gint samp = ch + measurable;
+                     samp <= size - measurable;
+                     samp += channels * (measurable / 2)) {
                         gint sum_2 = 0;
                         gint num_2 = 0;
                         gdouble vol_2 = 0.0;
@@ -151,7 +153,6 @@ static inline gdouble * render (struct state * state,
                                 vol = vol_2;
                         }
                 }
-                g_print ("%f\n", vol);
 
                 /* gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / 65536.0;
 
