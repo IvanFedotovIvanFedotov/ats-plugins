@@ -155,7 +155,7 @@ static inline gdouble * render (struct state * state,
                 guint64 sum = 0;
                 guint16 num = 0;
                 for (gint k = ch; k < amap.size; k = k + ai->channels) {
-                        sum += data_16[k];
+                        sum += data_16[k] + 32768;
                         num ++;
                 }
                 if (num > 0) {
