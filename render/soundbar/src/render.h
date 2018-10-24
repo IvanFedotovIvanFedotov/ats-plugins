@@ -112,7 +112,6 @@ static inline gdouble * render (struct state * state,
         }
 
         /* calculations part */
-
         guint16 hor, vert;
         hor = horizontal ? vi->height : vi->width;
         vert = horizontal ? vi->width : vi->height;
@@ -133,35 +132,36 @@ static inline gdouble * render (struct state * state,
         for (gint ch = 0; ch < channels; ch++) {
 
                 gdouble vol = 0.0;
-                gint step = 1;
-                if (measurable / 2 > 1) {
-                        step = measurable / 2;
-                }
-                for (gint samp = ch + measurable;
-                     samp <= size - measurable;
-                     samp += channels * step) {
-                        gint64 sum_2 = 0;
-                        gint16 num_2 = 0;
-                        gdouble vol_2 = 0.0;
-                        for (gint i = samp - measurable * channels;
-                             i <= samp + measurable * channels;
-                             i += channels) {
-                                if (i >= 0 && i <= size) {
-                                        sum_2 += data_16[i] + 32768;
-                                        num_2 ++;
-                                }
-                        }
-                        vol_2 = ((gdouble)(sum_2 / num_2)) / 65536.0;
-                        if (vol_2 > vol) {
-                                vol = vol_2;
-                        }
-                }
+                /*
+                  gint step = 1;
+                  if (measurable / 2 > 1) {
+                  step = measurable / 2;
+                  }
+                  for (gint samp = ch + measurable;
+                  samp <= size - measurable;
+                  samp += channels * step) {
+                  gint64 sum_2 = 0;
+                  gint16 num_2 = 0;
+                  gdouble vol_2 = 0.0;
+                  for (gint i = samp - measurable * channels;
+                  i <= samp + measurable * channels;
+                  i += channels) {
+                  if (i >= 0 && i <= size) {
+                  sum_2 += data_16[i] + 32768;
+                  num_2 ++;
+                  }
+                  }
+                  vol_2 = ((gdouble)(sum_2 / num_2)) / 65536.0;
+                  if (vol_2 > vol) {
+                  vol = vol_2;
+                  }
+                  }
+                */
+                gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / 65536.0;
 
-                /* gdouble new_vol = (gdouble)(sum[ch] / samples_per_ch) / 65536.0;
-
-                   if (new_vol > vol) {
-                   vol = new_vol;
-                   } */
+                if (new_vol > vol) {
+                        vol = new_vol;
+                }
                 gdouble s = 0.1 / (gdouble)fps;
 
                 /* rendering part */
