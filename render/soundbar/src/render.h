@@ -103,8 +103,8 @@ static inline gdouble * render (struct state * state,
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
         gdouble samples_per_ch = size / channels;
-        /*  guint64 sum [MAX_CHANNEL_N] = { 0 };
-            gint measurable = (rate / channels) / 400;*/
+        guint64 sum [MAX_CHANNEL_N] = { 0 };
+        /*    gint measurable = (rate / channels) / 400;*/
 
         /* making transparent im */
         for (guint i = 0; i < vi->height * vi->width; i++) {
