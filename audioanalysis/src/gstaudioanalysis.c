@@ -430,6 +430,7 @@ gst_audioanalysis_start (GstBaseTransform * trans)
         atomic_store(&audioanalysis->timeout_last_clock,
                      gst_clock_get_time (gst_element_get_clock (GST_ELEMENT(trans))));
 
+        audioanalysis->task_counter = 0;
         g_rec_mutex_init (&audioanalysis->task_lock);
         audioanalysis->timeout_task = gst_task_new ((GstTaskFunction) gst_audioanalysis_timeout, trans, NULL);
         gst_task_set_lock (audioanalysis->timeout_task, &audioanalysis->task_lock);
@@ -678,14 +679,13 @@ static void
 gst_audioanalysis_timeout (GstAudioAnalysis * aa)
 {
         GstClockTime time, timeout_last_clock;
-        static int counter     = 0;
         
         sleep(1);
-        if (counter <= aa->timeout) {
-                counter += 1;
+        if (aa->task_counter <= aa->timeout) {
+                aa->task_counter += 1;
                 return;
         } else {
-                counter = 0;
+                aa->task_counter = 0;
         }
         
         time = gst_clock_get_time (gst_element_get_clock(GST_ELEMENT(aa)));

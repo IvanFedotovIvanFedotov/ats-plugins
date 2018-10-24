@@ -58,6 +58,7 @@ struct _GstVideoAnalysis
         struct Accumulator * acc_buffer;
 
         /* Frame-related data */
+        int                  task_counter;
         GRecMutex            task_lock;
         GstClockTimeDiff     timeout_clock;
         _Atomic GstClockTime timeout_last_clock;

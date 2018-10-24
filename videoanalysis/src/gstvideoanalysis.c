@@ -590,6 +590,7 @@ gst_videoanalysis_start (GstBaseTransform * trans)
         atomic_store(&videoanalysis->timeout_last_clock,
                      gst_clock_get_time (gst_element_get_clock (GST_ELEMENT(trans))));
 
+        videoanalysis->task_counter = 0;
         g_rec_mutex_init (&videoanalysis->task_lock);
         videoanalysis->timeout_task = gst_task_new ((GstTaskFunction) gst_videoanalysis_timeout, trans, NULL);
         gst_task_set_lock (videoanalysis->timeout_task, &videoanalysis->task_lock);
@@ -938,14 +939,13 @@ static void
 gst_videoanalysis_timeout (GstVideoAnalysis * va)
 {
         GstClockTime time, timeout_last_clock;
-        static int counter     = 0;
         
         sleep(1);
-        if (counter <= va->timeout) {
-                counter += 1;
+        if (va->task_counter <= va->timeout) {
+                va->task_counter += 1;
                 return;
         } else {
-                counter = 0;
+                va->task_counter = 0;
         }
         
         time = gst_clock_get_time (gst_element_get_clock(GST_ELEMENT(va)));
