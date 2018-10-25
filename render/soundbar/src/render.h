@@ -169,7 +169,7 @@ static inline gdouble * render (struct state * state,
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
         /*   gdouble samples_per_ch = ai->samples; */
-        gint measurable = (rate / channels) / 200;
+        /*   gint measurable = (rate / channels) / 200; */
         /*    guint64 sum [MAX_CHANNEL_N] = { 0 }; */
 
         /* making transparent im */
@@ -194,8 +194,8 @@ static inline gdouble * render (struct state * state,
 
         for (gint ch = 0; ch < channels; ch++) {
 
-                gint average = 0;
-
+                gint max = 0;
+/*
                 for (gint samp = ch;
                      samp <= size - measurable * channels;
                      samp += channels) {
@@ -215,9 +215,14 @@ static inline gdouble * render (struct state * state,
                                 average = average_1;
                         }
 
+                        }*/
+                for (gint i = ch; i < size; i += channels) {
+                        if (data_16[i] + 32768 > max) {
+                                max = (data_16[i] + 32768);
+                        }
                 }
 
-                gint db = sample_to_db (average);
+                gint db = sample_to_db (max);
                 gdouble vol = (gdouble)(20 + db) / 20;
 
 
