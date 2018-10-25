@@ -16,7 +16,37 @@ static const guint32 transparent_black = 0x00000000;
 static const guint8 lvl_height = 5;  /* soundbar level height in px */
 
 static inline gint sample_to_db (gint sample) {
-        if (sample < 3095) {
+        if (sample < 979) {
+                return -30;
+        }
+        else if (sample < 1098) {
+                return -29;
+        }
+        else if (sample < 1232) {
+                return -28;
+        }
+        else if (sample < 1383) {
+                return -27;
+        }
+        else if (sample < 1551) {
+                return -26;
+        }
+        else if (sample < 1741) {
+                return -25;
+        }
+        else if (sample < 1953) {
+                return -24;
+        }
+        else if (sample < 2191) {
+                return -23;
+        }
+        else if (sample < 2459) {
+                return -22;
+        }
+        else if (sample < 2759) {
+                return -21;
+        }
+        else if (sample < 3095) {
                 return -20;
         }
         else if (sample < 3473) {
@@ -167,9 +197,9 @@ static inline gdouble * render (struct state * state,
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
         gint rate     = ai->rate;
-/*        gdouble samples_per_ch = size / channels; */
+        gdouble samples_per_ch = size / channels;
         /*   gint measurable = (rate / channels) / 200; */
-/*        guint64 sum [MAX_CHANNEL_N] = { 0 }; */
+        guint64 sum [MAX_CHANNEL_N] = { 0 };
 
         /* making transparent im */
         for (guint i = 0; i < vi->height * vi->width; i++) {
@@ -193,17 +223,13 @@ static inline gdouble * render (struct state * state,
 
         for (gint ch = 0; ch < channels; ch++) {
 
-                gint max = 0;
-
-                for (gint i = ch; i < size; i += channels) {
-                        if (abs (data_16[i]) > max) {
-                                max = abs (data_16[i]);
-                        }
+                for (gint i = ch; i <= size; i += channels) {
+                        sum[ch] += abs (data_16[i]);
                 }
 
-                gint db = sample_to_db (max);
-                gdouble vol = (gdouble)(20 + db) / 20;
-
+                gint new_vol = sum[ch] / samples_per_ch;
+                gdouble db = sample_to_db (new_vol);
+                gdouble vol = (30.0 + db) / 30.0;
 
                 gdouble s = 0.05 * (gdouble)size / (gdouble)rate;
 
