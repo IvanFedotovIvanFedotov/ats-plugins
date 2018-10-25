@@ -35,7 +35,7 @@ static inline guint32 colour (gdouble level) {
 }
 
 static inline void horizontal_rendering (struct video_info * vi,
-                                         gdouble peak,
+                                         /*  gdouble peak,*/
                                          guint32 * vdata,
                                          guint16 l_b,
                                          guint16 r_b,
@@ -58,7 +58,7 @@ static inline void horizontal_rendering (struct video_info * vi,
 }
 
 static inline void vertical_rendering (struct video_info * vi,
-                                       gdouble peak,
+                                       /* gdouble peak, */
                                        guint32 * vdata,
                                        guint16 l_b,
                                        guint16 r_b,
@@ -88,7 +88,7 @@ static inline gdouble * render (struct state * state,
                                 struct audio_info * ai,
                                 guint32 * vdata,
                                 GstMapInfo amap,
-                                gdouble * peaks,
+                                /* gdouble * peaks, */
                                 guint8 channel_width1,
                                 gdouble horizontal,
                                 gint max_channel) {
@@ -174,19 +174,19 @@ static inline gdouble * render (struct state * state,
                                 }*/
 
                         if (horizontal) {
-                                horizontal_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
+                                horizontal_rendering (vi, /*peaks[ch],*/ vdata, l_b, r_b, levels, loudness);
                         }
                         else {
-                                vertical_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
+                                vertical_rendering (vi, /*peaks[ch],*/ vdata, l_b, r_b, levels, loudness);
                         }
                 }
                 else
                 {
                         if (horizontal) {
-                                horizontal_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
+                                horizontal_rendering (vi,/* 0.0,*/ vdata, l_b, r_b, levels, loudness);
                         }
                         else {
-                                vertical_rendering (vi, 0.0, vdata, l_b, r_b, levels, loudness);
+                                vertical_rendering (vi,/* 0.0,*/ vdata, l_b, r_b, levels, loudness);
                         }
                 }
         }
