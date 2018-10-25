@@ -16,67 +16,67 @@ static const guint32 transparent_black = 0x00000000;
 static const guint8 lvl_height = 5;  /* soundbar level height in px */
 
 static inline gint sample_to_db (gint sample) {
-        if (sample < 6942) {
+        if (sample < 3095) {
                 return -20;
         }
-        else if (sample < 7789) {
+        else if (sample < 3473) {
                 return -19;
         }
-        else if (sample < 8739) {
+        else if (sample < 3896) {
                 return -18;
         }
-        else if (sample < 9806) {
+        else if (sample < 4906) {
                 return -17;
         }
-        else if (sample < 11002) {
+        else if (sample < 5504) {
                 return -16;
         }
-        else if (sample < 12345) {
+        else if (sample < 6175) {
                 return -15;
         }
-        else if (sample < 13851) {
+        else if (sample < 6929) {
                 return -14;
         }
-        else if (sample < 15541) {
+        else if (sample < 7775) {
                 return -13;
         }
-        else if (sample < 17437) {
+        else if (sample < 8723) {
                 return -12;
         }
-        else if (sample < 19565) {
+        else if (sample < 9788) {
                 return -11;
         }
-        else if (sample < 21952) {
+        else if (sample < 10982) {
                 return -10;
         }
-        else if (sample < 24631) {
+        else if (sample < 12322) {
                 return -9;
         }
-        else if (sample < 27636) {
+        else if (sample < 13825) {
                 return -8;
         }
-        else if (sample < 31008) {
+        else if (sample < 15512) {
                 return -7;
         }
-        else if (sample < 34792) {
+        else if (sample < 17406) {
                 return -6;
         }
-        else if (sample < 39037) {
+        else if (sample < 19529) {
                 return -5;
         }
-        else if (sample < 43801) {
+        else if (sample < 21912) {
                 return -4;
         }
-        else if (sample < 49145) {
+        else if (sample < 24586) {
                 return -3;
         }
-        else if (sample < 55142) {
+        else if (sample < 27586) {
                 return -2;
         }
-        else if (sample < 61870) {
+        else if (sample < 30951) {
                 return -1;
         }
-        else if (sample < 65536) {
+        else if (sample < 32768) {
                 return 0;
         }
 }
@@ -164,13 +164,12 @@ static inline gdouble * render (struct state * state,
         gdouble levels;
         gint16 *data_16 = (gint16 *)amap.data;
         guint16 channel_width;
-        gint fps      = vi->fps;
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
         gint rate     = ai->rate;
-        /*   gdouble samples_per_ch = ai->samples; */
+/*        gdouble samples_per_ch = size / channels; */
         /*   gint measurable = (rate / channels) / 200; */
-        /*    guint64 sum [MAX_CHANNEL_N] = { 0 }; */
+/*        guint64 sum [MAX_CHANNEL_N] = { 0 }; */
 
         /* making transparent im */
         for (guint i = 0; i < vi->height * vi->width; i++) {
@@ -195,30 +194,10 @@ static inline gdouble * render (struct state * state,
         for (gint ch = 0; ch < channels; ch++) {
 
                 gint max = 0;
-/*
-                for (gint samp = ch;
-                     samp <= size - measurable * channels;
-                     samp += channels) {
-                        gint64 sum = 0;
-                        gint16 num = 0;
 
-                        for (gint i = samp;
-                             i <= samp + measurable * channels;
-                             i += channels) {
-                                if (i >= 0 && i <= size) {
-                                        sum += (data_16[i] + 32768);
-                                        num ++;
-                                }
-                        }
-                        gint average_1 = sum / num;
-                        if (average_1 > average ) {
-                                average = average_1;
-                        }
-
-                        }*/
                 for (gint i = ch; i < size; i += channels) {
-                        if (data_16[i] + 32768 > max) {
-                                max = (data_16[i] + 32768);
+                        if (abs (data_16[i]) > max) {
+                                max = abs (data_16[i]);
                         }
                 }
 
@@ -229,7 +208,6 @@ static inline gdouble * render (struct state * state,
                 gdouble s = 0.05 * (gdouble)size / (gdouble)rate;
 
                 /* rendering part */
-    
                 guint16 l_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
                         channel_width * ch + ch * 2;
                 guint16 r_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
