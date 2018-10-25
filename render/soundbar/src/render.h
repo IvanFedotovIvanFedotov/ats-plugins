@@ -42,11 +42,11 @@ static inline void horizontal_rendering (struct video_info * vi,
                                          gdouble levels,
                                          guint8 loudness) {
         for (gint h = l_b; h < r_b; h++) {
-                if (peak > 0.0) {
+                /* if (peak > 0.0) {
                         gint num;
                         num = h * (vi->width) + ((vi->width) * peak);
                         vdata[num] = white;
-                }
+                        }*/
 
                 for (gint i = 1; i <= loudness; i++) {
                         for (gint w = lvl_height * (levels - i) + 1; w < lvl_height * (levels - i + 1) - 1; w++) {
@@ -65,14 +65,14 @@ static inline void vertical_rendering (struct video_info * vi,
                                        gdouble levels,
                                        guint8 loudness) {
         for (gint h = l_b; h < r_b; h++) {
-                if (peak > 0.0)
+                /* if (peak > 0.0)
                 {
                         guint16 peak_lvl;
                         gint num;
                         peak_lvl = lvl_height * (1 - peak) * levels;
                         num = h + (vi->width) * peak_lvl;
                         vdata[num] = white;
-                }
+                        }*/
 
                 for (gint i = 1; i <= loudness; i++) {
                         for (gint w = lvl_height * (levels - i) + 1; w < lvl_height * (levels - i + 1) - 1; w++) {
@@ -155,7 +155,7 @@ static inline gdouble * render (struct state * state,
                 gdouble vol = (40.0 + db) / 40.0;
 
                 if (vol < 0.0) { vol = 0.0;}
-                gdouble s = 0.05 * (gdouble)size / (gdouble)rate;
+                /*  gdouble s = 0.05 * (gdouble)size / (gdouble)rate;*/
 
                 /* rendering part */
                 guint16 l_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +
@@ -166,12 +166,12 @@ static inline gdouble * render (struct state * state,
 
                 if (ch < max_channel)
                 {
-                        if (peaks[ch] <= vol) {
+                        /*  if (peaks[ch] <= vol) {
                                 peaks[ch] = vol;
                         }
                         else {
                                 peaks[ch] = peaks[ch] - s;
-                        }
+                                }*/
 
                         if (horizontal) {
                                 horizontal_rendering (vi, peaks[ch], vdata, l_b, r_b, levels, loudness);
