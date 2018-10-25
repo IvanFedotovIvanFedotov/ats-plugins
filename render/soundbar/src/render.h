@@ -159,15 +159,15 @@ static inline gdouble * render (struct state * state,
                                 gdouble * peaks,
                                 guint8 channel_width1,
                                 gdouble horizontal,
-                                gint max_channel,
-                                gint rate) {
+                                gint max_channel) {
 
         gdouble levels;
         gint16 *data_16 = (gint16 *)amap.data;
         guint16 channel_width;
-        gint fps  = vi->fps;
+        gint fps      = vi->fps;
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
+        gint rate     = ai->rate;
         /*   gdouble samples_per_ch = ai->samples; */
         /*   gint measurable = (rate / channels) / 200; */
         /*    guint64 sum [MAX_CHANNEL_N] = { 0 }; */
@@ -226,7 +226,7 @@ static inline gdouble * render (struct state * state,
                 gdouble vol = (gdouble)(20 + db) / 20;
 
 
-                gdouble s = 0.1 / (gdouble)fps;
+                gdouble s = 0.05 * (gdouble)size / (gdouble)rate;
 
                 /* rendering part */
     
