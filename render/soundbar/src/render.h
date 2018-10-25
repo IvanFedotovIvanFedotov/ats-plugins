@@ -15,132 +15,6 @@ static const guint32 transparent_black = 0x00000000;
 
 static const guint8 lvl_height = 5;  /* soundbar level height in px */
 
-static inline gint sample_to_db (gint sample) {
-        if (sample < 310) {
-                return -40;
-        }
-        else if (sample < 347) {
-                return -39;
-        }
-        else if (sample < 390) {
-                return -38;
-        }
-        else if (sample < 437) {
-                return -37;
-        }
-        else if (sample < 491) {
-                return -36;
-        }
-        else if (sample < 550) {
-                return -35;
-        }
-        else if (sample < 618) {
-                return -34;
-        }
-        else if (sample < 693) {
-                return -33;
-        }
-        else if (sample < 777) {
-                return -32;
-        }
-        else if (sample < 872) {
-                return -31;
-        }
-        else if (sample < 979) {
-                return -30;
-        }
-        else if (sample < 1098) {
-                return -29;
-        }
-        else if (sample < 1232) {
-                return -28;
-        }
-        else if (sample < 1383) {
-                return -27;
-        }
-        else if (sample < 1551) {
-                return -26;
-        }
-        else if (sample < 1741) {
-                return -25;
-        }
-        else if (sample < 1953) {
-                return -24;
-        }
-        else if (sample < 2191) {
-                return -23;
-        }
-        else if (sample < 2459) {
-                return -22;
-        }
-        else if (sample < 2759) {
-                return -21;
-        }
-        else if (sample < 3095) {
-                return -20;
-        }
-        else if (sample < 3473) {
-                return -19;
-        }
-        else if (sample < 3896) {
-                return -18;
-        }
-        else if (sample < 4906) {
-                return -17;
-        }
-        else if (sample < 5504) {
-                return -16;
-        }
-        else if (sample < 6175) {
-                return -15;
-        }
-        else if (sample < 6929) {
-                return -14;
-        }
-        else if (sample < 7775) {
-                return -13;
-        }
-        else if (sample < 8723) {
-                return -12;
-        }
-        else if (sample < 9788) {
-                return -11;
-        }
-        else if (sample < 10982) {
-                return -10;
-        }
-        else if (sample < 12322) {
-                return -9;
-        }
-        else if (sample < 13825) {
-                return -8;
-        }
-        else if (sample < 15512) {
-                return -7;
-        }
-        else if (sample < 17406) {
-                return -6;
-        }
-        else if (sample < 19529) {
-                return -5;
-        }
-        else if (sample < 21912) {
-                return -4;
-        }
-        else if (sample < 24586) {
-                return -3;
-        }
-        else if (sample < 27586) {
-                return -2;
-        }
-        else if (sample < 30951) {
-                return -1;
-        }
-        else if (sample < 32768) {
-                return 0;
-        }
-}
-
 static inline guint32 colour (gdouble level) {
         /* receives the index of soundbar level and returns its color*/
 
@@ -225,9 +99,7 @@ static inline gdouble * render (struct state * state,
         gint channels = ai->channels;
         gint size     = amap.size / sizeof (gint16);
         gint rate     = ai->rate;
-        gdouble samples_per_ch = size / channels;
-        /*   gint measurable = (rate / channels) / 200; */
-        guint64 sum [MAX_CHANNEL_N] = { 0 };
+        gint measurable = (rate / channels) / 200;
 
         /* making transparent im */
         for (guint i = 0; i < vi->height * vi->width; i++) {
@@ -251,13 +123,35 @@ static inline gdouble * render (struct state * state,
 
         for (gint ch = 0; ch < channels; ch++) {
 
-                for (gint i = ch; i <= size; i += channels) {
-                        sum[ch] += abs (data_16[i]);
+                gdouble new_vol = 0.0;
+                gdouble db = 0.0;
+
+                for (gint samp = ch;
+                     samp <= size - measurable;
+                     samp += channels) {
+                        gint64 sum = 0;
+                        gint16 num = 0;
+                        gdouble vol_2 = 0.0;
+                        for (gint i = samp;
+                             i <= samp + measurable * channels;
+                             i += channels) {
+                                if (i >= 0 && i <= size) {
+                                        sum += abs(data_16[i]);
+                                        num ++;
+                                }
+                        }
+                        vol_2 = (gdouble)(sum / num);
+                        if (vol_2 > new_vol) {
+                                new_vol = vol_2;
+                        }
                 }
 
-                gint new_vol = sum[ch] / samples_per_ch;
                 /*   gdouble db = sample_to_db (new_vol); */
-                gdouble db = 20.0 * (log10 ((gdouble)new_vol / 32768.0));
+                gdouble logarithm = log10(new_vol / 32768.0);
+
+                if (logarithm < 0.0) {
+                        db = 20.0 * logarithm;
+                }
                 gdouble vol = (40.0 + db) / 40.0;
 
                 if (vol < 0.0) { vol = 0.0;}
