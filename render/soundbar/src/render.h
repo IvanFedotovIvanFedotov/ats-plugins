@@ -16,7 +16,37 @@ static const guint32 transparent_black = 0x00000000;
 static const guint8 lvl_height = 5;  /* soundbar level height in px */
 
 static inline gint sample_to_db (gint sample) {
-        if (sample < 979) {
+        if (sample < 310) {
+                return -40;
+        }
+        else if (sample < 347) {
+                return -39;
+        }
+        else if (sample < 390) {
+                return -38;
+        }
+        else if (sample < 437) {
+                return -37;
+        }
+        else if (sample < 491) {
+                return -36;
+        }
+        else if (sample < 550) {
+                return -35;
+        }
+        else if (sample < 618) {
+                return -34;
+        }
+        else if (sample < 693) {
+                return -33;
+        }
+        else if (sample < 777) {
+                return -32;
+        }
+        else if (sample < 872) {
+                return -31;
+        }
+        else if (sample < 979) {
                 return -30;
         }
         else if (sample < 1098) {
@@ -113,16 +143,14 @@ static inline gint sample_to_db (gint sample) {
 
 static inline guint32 colour (gdouble level) {
         /* receives the index of soundbar level and returns its color*/
-        if (level < 0.2) {
-                return green;
-        }
-        else if (level < 0.4) {
+
+        if (level < 0.55) {
                 return l_green;
         }
-        else if (level < 0.6) {
+        else if (level < 0.75) {
                 return yellow;
         }
-        else if (level < 0.8) {
+        else if (level < 0.90) {
                 return orange;
         }
         else if (level < 1.0) {
@@ -228,9 +256,11 @@ static inline gdouble * render (struct state * state,
                 }
 
                 gint new_vol = sum[ch] / samples_per_ch;
-                gdouble db = sample_to_db (new_vol);
-                gdouble vol = (30.0 + db) / 30.0;
+                /*   gdouble db = sample_to_db (new_vol); */
+                gdouble db = 20.0 * (log10 ((gdouble)new_vol / 32768.0));
+                gdouble vol = (40.0 + db) / 40.0;
 
+                if (vol < 0.0) { vol = 0.0;}
                 gdouble s = 0.05 * (gdouble)size / (gdouble)rate;
 
                 /* rendering part */
