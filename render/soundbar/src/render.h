@@ -88,7 +88,7 @@ static inline gdouble * render (struct state * state,
                                 struct audio_info * ai,
                                 guint32 * vdata,
                                 GstMapInfo amap,
-                                /* gdouble * peaks, */
+                                gdouble * peaks,
                                 guint8 channel_width1,
                                 gdouble horizontal,
                                 gint max_channel) {
@@ -97,6 +97,7 @@ static inline gdouble * render (struct state * state,
         gint16 *data_16 = (gint16 *)amap.data;
         guint16 channel_width;
         gint channels = ai->channels;
+        gint rate     = ai->rate;
         gint size     = amap.size / sizeof (gint16);
         guint64 sum [MAX_CHANNEL_N] = { 0 };
         gdouble samples_per_ch = ai->samples;
@@ -141,7 +142,15 @@ static inline gdouble * render (struct state * state,
                 gdouble vol = (40.0 + db) / 40.0;
 
                 if (vol < 0.0) { vol = 0.0;}
-                /*  gdouble s = 0.05 * (gdouble)size / (gdouble)rate;*/
+                gdouble s = 0.1 * (gdouble)size / (gdouble)rate;
+
+                if (peaks[ch] > vol) {
+                        vol = peaks[ch] - s;
+                        peaks[ch] = peaks[ch] - s;
+                }
+                else {
+                        peaks[ch] = vol;
+                }
 
                 /* rendering part */
                 guint16 l_b = (hor - channel_width * (channels) - 2 * (channels)) / 2 +

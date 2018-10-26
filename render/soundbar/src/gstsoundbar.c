@@ -123,7 +123,7 @@ gst_soundbar_setup (GstAudioVisualizer * bscope) {
         return TRUE;
 }
 
-/* static gdouble peaks[MAX_CHANNEL_N] = {0.0}; */
+ static gdouble peaks[MAX_CHANNEL_N] = {0.0}; 
 
 static gboolean
 gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
@@ -152,7 +152,7 @@ gst_soundbar_render (GstAudioVisualizer * base, GstBuffer * audio,
         render (&scope->state, &vi, &ai,
                 (guint32 *) GST_VIDEO_FRAME_PLANE_DATA (video, 0),
                 amap,
-                /*  peaks, */
+                peaks,
                 channel_width,
                 horizontal,
                 MAX_CHANNEL_N);
