@@ -1,21 +1,21 @@
 /*
- * GStreamer glsoundbar
- * Copyright (C) 2018 NIITV.
- * Ivan Fedotov<ivanfedotovmail@yandex.ru>
+ * Copyright (C) 2018 NIITV. Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
- */
-
-/**
- * SECTION:element-glsoundbar
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
  *
- * FIXME:Describe glsoundbar here.
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
  *
- * <refsect2>
- * <title>Example launch line</title>
- * |[
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  *
- * ]|
- * </refsect2>
  */
 
 #ifdef HAVE_CONFIG_H
@@ -27,9 +27,6 @@
 #include "audiosamplesbuf.h"
 
 #include <math.h>
-
-
-
 
 void audiosamplesbuf_init(AudioSamplesBuf * filter){
 
@@ -214,11 +211,15 @@ gboolean audiosamplesbuf_proceed(AudioSamplesBuf * filter){
     else v=-100.0;
     if(v<-100.0)v=-100.0;
     filter->result.loud_average[i]=v/100.0+1.0;
+    if(filter->result.loud_average[i]<0.0)filter->result.loud_average[i]=0.0;
+    if(filter->result.loud_average[i]>1.0)filter->result.loud_average[i]=1.0;
 
     if(filter->loud_peak[i]>0.0000000001f)v=20.0*logf(filter->loud_peak[i])/logf(10.0);
     else v=-100.0;
     if(v<-100.0)v=-100.0;
     filter->result.loud_peak[i]=v/100.0+1.0;
+    if(filter->result.loud_peak[i]<0.0)filter->result.loud_peak[i]=0.0;
+    if(filter->result.loud_peak[i]>1.0)filter->result.loud_peak[i]=1.0;
 
   }
 

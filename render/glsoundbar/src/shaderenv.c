@@ -1,9 +1,9 @@
 /*
- * GStreamer gstgltestsrc
  * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
  * Copyright (C) 2002,2007 David A. Schleef <ds@schleef.org>
  * Copyright (C) 2008 Julien Isorce <julien.isorce@gmail.com>
  * Copyright (C) 2015 Matthew Waters <matthew@centricular.com>
+ * Copyright (C) 2018 NIITV. Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -19,11 +19,6 @@
  * License along with this library; if not, write to the
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
- *
- * GStreamer glsoundbar
- * Copyright (C) 2018 NIITV.
- * Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  */
 
@@ -47,7 +42,6 @@ gboolean shader_env_init_struct_fields(GstGLContext *context, struct ShaderEnv *
   src->attributes_location = -1;
 
   return TRUE;
-
 
 }
 
@@ -113,35 +107,6 @@ gboolean shader_env_bind(GstGLContext *context, struct ShaderEnv *src){
   return TRUE;
 
 }
-
-/*
-gboolean shader_env_data_set(GstGLContext *context, struct ShaderEnv *src){
-
-  const GstGLFuncs *gl = context->gl_vtable;
-
-  gl->BufferData (GL_ARRAY_BUFFER, src->vertices_with_colors_num * sizeof(XYZWRGBA),
-        src->vertices_with_colors, GL_DYNAMIC_DRAW); //GL_STATIC_DRAW);
-
-  gl->BufferData (GL_ELEMENT_ARRAY_BUFFER, src->indices_num * sizeof (gushort),
-        src->indices, GL_DYNAMIC_DRAW);
-
-  if(src->enable_shader_using_attribute__position){
-    gl->VertexAttribPointer (src->attributes[0].location, src->attributes[0].n_elements,
-                             src->attributes[0].element_type, GL_FALSE, src->attributes[0].stride,
-                             (void *) (gintptr) src->attributes[0].offset);
-    gl->EnableVertexAttribArray (src->attributes[0].location);
-  }
-  if(src->enable_shader_using_attribute__a_color){
-    gl->VertexAttribPointer (src->attributes[1].location, src->attributes[1].n_elements,
-                             src->attributes[1].element_type, GL_FALSE, src->attributes[1].stride,
-                             (void *) (gintptr) src->attributes[1].offset);
-    gl->EnableVertexAttribArray (src->attributes[1].location);
-  }
-
-  return TRUE;
-
-}
-*/
 
 gboolean shader_env_draw(GstGLContext *context, struct ShaderEnv *src){
 

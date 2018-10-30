@@ -1,31 +1,11 @@
 /*
- * GStreamer gstaudiovisualizer
  * Copyright (C) <2011> Stefan Kost <ensonic@users.sf.net>
  * Copyright (C) <2015> Luis de Bethencourt <luis@debethencourt.com>
- *
- * gstaudiovisualizer.c: base class for audio visualisation elements
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301, USA.
- *
- *
- * GStreamer gstgltestsrc
  * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
  * Copyright (C) 2002,2007 David A. Schleef <ds@schleef.org>
  * Copyright (C) 2008 Julien Isorce <julien.isorce@gmail.com>
  * Copyright (C) 2015 Matthew Waters <matthew@centricular.com>
+ * Copyright (C) 2018 NIITV. Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -41,11 +21,6 @@
  * License along with this library; if not, write to the
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
- *
- * GStreamer glsoundbar
- * Copyright (C) 2018 NIITV.
- * Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  */
 
@@ -92,12 +67,11 @@ GST_DEBUG_CATEGORY_STATIC (gst_glsoundbar_debug);
 #define USE_PEER_BUFFERALLOC
 #define SUPPORTED_GL_APIS (GST_GL_API_OPENGL | GST_GL_API_OPENGL3 | GST_GL_API_GLES2)
 
-// Filter signals and args
 enum
 {
-  // FILL ME
-  LAST_SIGNAL,
-  PROP_BARS_DIRECTION,//wave
+
+  PROP_0,
+  PROP_BARS_DIRECTION,
   PROP_BAR_ASPECT,
   PROP_BAR_RISC_LEN,
   PROP_BAR_RISC_STEP,
@@ -105,30 +79,17 @@ enum
   PROP_AUDIO_LOUD_SPEED,
   PROP_AUDIO_PEAK_SPEED,
   PROP_BAR_ASPECT_AUTO,
-
-  PROP_BG_COLOR_R,
-  PROP_BG_COLOR_G,
-  PROP_BG_COLOR_B,
-  PROP_BG_COLOR_A,
-
-  PROP_TIMESTAMP_OFFSET
+  PROP_BG_COLOR_ARGB,
+  PROP_TIMESTAMP_OFFSET,
+  PROP_LAST
 
 };
-
-enum
-{
-  PROP_0,
-};
-
-
 
 #define gst_glsoundbar_parent_class parent_class
 G_DEFINE_TYPE (GstGLSoundbar, gst_glsoundbar, GST_TYPE_ELEMENT);
 
-
 #define GST_GLSOUNDBAR_GET_PRIVATE(obj)  \
     (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_GLSOUNDBAR, GstGLSoundbarPrivate))
-
 
 struct _GstGLSoundbarPrivate
 {
@@ -187,7 +148,7 @@ GST_STATIC_PAD_TEMPLATE ("sink",
         )
     );
 
-static void gst_glsoundbar_finalize (GObject * object);
+//static void gst_glsoundbar_finalize (GObject * object);
 static void gst_glsoundbar_set_property (GObject * object,
     guint prop_id, const GValue * value, GParamSpec * pspec);
 static void gst_glsoundbar_get_property (GObject * object,
@@ -211,17 +172,8 @@ static GstStateChangeReturn gst_glsoundbar_change_state (GstElement *
 static gboolean gst_glsoundbar_do_bufferpool (GstGLSoundbar * scope,
     GstCaps * outcaps);
 static gboolean
-default_decide_allocation (GstGLSoundbar * scope, GstQuery * query);
-static gint gst_glsoundbar_get_draw_direction(GstGLSoundbar *scope);
+    default_decide_allocation (GstGLSoundbar * scope, GstQuery * query);
 
-
-
-
-gint gst_glsoundbar_get_draw_direction(GstGLSoundbar *scope){
-
-  return scope->bars_draw_direction;
-
-}
 
 static void
 gst_glsoundbar_reset (GstGLSoundbar * scope)
@@ -297,9 +249,6 @@ gst_glsoundbar_src_setcaps (GstGLSoundbar * scope, GstCaps * caps)
       scope->vinfo.size);
   gst_video_frame_map (&scope->priv->tempframe, &scope->vinfo,
       scope->priv->tempbuf, GST_MAP_READWRITE);
-
-  g_free (scope->flt);
-  scope->flt = g_new0 (gdouble, 6 * GST_AUDIO_INFO_CHANNELS (&scope->ainfo));
 
   GST_DEBUG_OBJECT (scope, "video: dimension %dx%d, framerate %d/%d",
       GST_VIDEO_INFO_WIDTH (&info), GST_VIDEO_INFO_HEIGHT (&info),
@@ -682,29 +631,6 @@ activate_failed:
 }
 
 
-
-static void
-gst_glsoundbar_finalize (GObject * object)
-{
-  GstGLSoundbar *scope = GST_GLSOUNDBAR (object);
-
-  g_mutex_clear(&scope->priv->config_lock);
-
-  if(scope->gl_drawing_created==TRUE){
-    gldraw_close (scope->context, &scope->gl_drawing, &scope->audio_samples_buf.result);
-    scope->gl_drawing_created=FALSE;
-  }
-
-  if (scope->flt) {
-    g_free (scope->flt);
-    scope->flt = NULL;
-  }
-
-  G_OBJECT_CLASS (parent_class)->finalize (object);
-}
-
-
-
 static void
 gst_gl_test_src_gl_stop (GstGLContext * context, GstGLSoundbar * src)
 {
@@ -723,6 +649,7 @@ gst_gl_test_src_gl_stop (GstGLContext * context, GstGLSoundbar * src)
 }
 
 
+
 static void
 gst_glsoundbar_dispose (GObject * object)
 {
@@ -730,12 +657,8 @@ gst_glsoundbar_dispose (GObject * object)
 
   if (scope->context){
     gst_gl_context_thread_add (scope->context, (GstGLContextThreadFunc) gst_gl_test_src_gl_stop, scope);
-    GTimeVal timev;
-    g_get_current_time(&timev);
-    g_time_val_add(&timev,10);
   }
-  if (scope->context)
-    gst_object_unref (scope->context);
+  if (scope->context)gst_object_unref (scope->context);
   scope->context = NULL;
 
   audiosamplesbuf_free(&scope->audio_samples_buf);
@@ -757,6 +680,9 @@ gst_glsoundbar_dispose (GObject * object)
     g_mutex_clear (&scope->priv->config_lock);
     scope->priv->config_lock.p = NULL;
   }
+
+  g_mutex_clear(&scope->priv->config_lock);
+
   G_OBJECT_CLASS (parent_class)->dispose (object);
 }
 
@@ -767,19 +693,22 @@ gst_gl_test_src_callback (gpointer stuff)
   GstGLSoundbar *src = GST_GLSOUNDBAR (stuff);
 
   gboolean res;
+  float a,r,g,b;
 
   if(src->gl_drawing_created==FALSE){
 
+    a=(float)((src->bg_color & 0xff000000)>>24)/255.0;
+    r=(float)((src->bg_color & 0x00ff0000)>>16)/255.0;
+    g=(float)((src->bg_color & 0x0000ff00)>>8)/255.0;
+    b=(float)((src->bg_color & 0x000000ff))/255.0;
+
     src->gl_result =  gldraw_init (src->context, &src->gl_drawing, &src->audio_samples_buf.result,
                                                 src->vinfo.width, src->vinfo.height,
-                                                gst_glsoundbar_get_draw_direction(src),
+                                                src->bars_draw_direction,
                                                 src->bar_aspect, src->bar_risc_len, src->bar_risc_step,
                                                 src->peak_height,
                                                 src->bar_aspect_auto,
-                                                src->bg_color_r,
-                                                src->bg_color_g,
-                                                src->bg_color_b,
-                                                src->bg_color_a);
+                                                r,g,b,a);
 
     src->gl_drawing_created=TRUE;
 
@@ -1216,6 +1145,13 @@ gst_glsoundbar_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       gst_glsoundbar_reset (scope);
       break;
+    case GST_STATE_CHANGE_NULL_TO_READY:
+      if (!gst_gl_ensure_element_data (element, &scope->display,
+              &scope->other_context)){
+        return GST_STATE_CHANGE_FAILURE;
+      }
+      gst_gl_display_filter_gl_api (scope->display, SUPPORTED_GL_APIS);
+      break;
     default:
       break;
   }
@@ -1227,6 +1163,19 @@ gst_glsoundbar_change_state (GstElement * element,
       gst_glsoundbar_set_allocation (scope, NULL, NULL, NULL, NULL);
       break;
     case GST_STATE_CHANGE_READY_TO_NULL:
+      if (scope->context){
+        gst_gl_context_thread_add (scope->context, (GstGLContextThreadFunc) gst_gl_test_src_gl_stop, scope);
+      }
+      if (scope->context)gst_object_unref (scope->context);
+      scope->context = NULL;
+      if (scope->other_context) {
+        gst_object_unref (scope->other_context);
+        scope->other_context = NULL;
+      }
+      if (scope->display) {
+        gst_object_unref (scope->display);
+        scope->display = NULL;
+      }
       break;
     default:
       break;
@@ -1273,19 +1222,9 @@ gst_glsoundbar_set_property (GObject * object, guint prop_id,
     case PROP_BAR_ASPECT_AUTO:
         scope->bar_aspect_auto=g_value_get_float(value);
       break;
-    case PROP_BG_COLOR_R:
-        scope->bg_color_r=g_value_get_float(value);
+    case PROP_BG_COLOR_ARGB:
+        scope->bg_color=g_value_get_uint(value);
       break;
-    case PROP_BG_COLOR_G:
-        scope->bg_color_g=g_value_get_float(value);
-      break;
-    case PROP_BG_COLOR_B:
-        scope->bg_color_b=g_value_get_float(value);
-      break;
-    case PROP_BG_COLOR_A:
-        scope->bg_color_a=g_value_get_float(value);
-      break;
-
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1330,18 +1269,10 @@ gst_glsoundbar_get_property (GObject * object, guint prop_id,
     case PROP_BAR_ASPECT_AUTO:
         g_value_set_int(value, scope->bar_aspect_auto);
       break;
-    case PROP_BG_COLOR_R:
-        g_value_set_float(value, scope->bg_color_r);
+    case PROP_BG_COLOR_ARGB:
+        g_value_set_uint(value, scope->bg_color);
       break;
-    case PROP_BG_COLOR_G:
-        g_value_set_float(value, scope->bg_color_g);
-      break;
-    case PROP_BG_COLOR_B:
-        g_value_set_float(value, scope->bg_color_b);
-      break;
-    case PROP_BG_COLOR_A:
-        g_value_set_float(value, scope->bg_color_a);
-      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -1376,7 +1307,7 @@ gst_glsoundbar_class_init (GstGLSoundbarClass * klass)
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_glsoundbar_change_state);
 
-  gobject_class->finalize = gst_glsoundbar_finalize;
+  //gobject_class->finalize = gst_glsoundbar_finalize;
 
   gst_element_class_add_static_pad_template (gstelement_class,
       &gst_glsoundbar_src_template);
@@ -1433,7 +1364,7 @@ gst_glsoundbar_class_init (GstGLSoundbarClass * klass)
                           0.001, 1000.0, 1.0,
                           G_PARAM_READWRITE));
 
-     g_object_class_install_property
+  g_object_class_install_property
         (gobject_class, PROP_BAR_ASPECT_AUTO,
          g_param_spec_int("bar-aspect-auto", "Bar auto aspect",
                           "0 - auto aspect disable, 1 - auto aspect enable",
@@ -1447,32 +1378,11 @@ gst_glsoundbar_class_init (GstGLSoundbarClass * klass)
           G_MAXINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property
-        (gobject_class, PROP_BG_COLOR_R,
-         g_param_spec_float("bg-color-r", "Backgound color R",
-                          "Backgound color R",
-                          0.0, 1.0, 1.0,
-                          G_PARAM_READWRITE));
-
-  g_object_class_install_property
-        (gobject_class, PROP_BG_COLOR_G,
-         g_param_spec_float("bg-color-g", "Backgound color G",
-                          "Backgound color G",
-                          0.0, 1.0, 1.0,
-                          G_PARAM_READWRITE));
-
-  g_object_class_install_property
-        (gobject_class, PROP_BG_COLOR_B,
-         g_param_spec_float("bg-color-b", "Backgound color B",
-                          "Backgound color B",
-                          0.0, 1.0, 1.0,
-                          G_PARAM_READWRITE));
-
-  g_object_class_install_property
-        (gobject_class, PROP_BG_COLOR_A,
-         g_param_spec_float("bg-color-a", "Backgound color A",
-                          "Backgound color A",
-                          0.0, 1.0, 1.0,
-                          G_PARAM_READWRITE));
+        (gobject_class, PROP_BG_COLOR_ARGB,
+         g_param_spec_uint("bg-color-argb", "Backgound color ARGB",
+                          "Backgound color ARGB",
+                          0, G_MAXUINT32, 0xff000000,
+                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS ));
 
 }
 
@@ -1551,10 +1461,7 @@ gst_glsoundbar_init (GstGLSoundbar * filter)
   filter->audio_peak_speed=1.0;
   filter->bar_aspect_auto=1;
 
-  filter->bg_color_r=0.0;
-  filter->bg_color_g=0.0;
-  filter->bg_color_b=0.0;
-  filter->bg_color_a=1.0;
+  filter->bg_color=0xff000000;
 
 }
 

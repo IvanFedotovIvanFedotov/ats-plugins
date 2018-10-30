@@ -1,31 +1,11 @@
 /*
- * GStreamer gstaudiovisualizer
  * Copyright (C) <2011> Stefan Kost <ensonic@users.sf.net>
  * Copyright (C) <2015> Luis de Bethencourt <luis@debethencourt.com>
- *
- * gstaudiovisualizer.c: base class for audio visualisation elements
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301, USA.
- *
- *
- * GStreamer gstgltestsrc
  * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
  * Copyright (C) 2002,2007 David A. Schleef <ds@schleef.org>
  * Copyright (C) 2008 Julien Isorce <julien.isorce@gmail.com>
  * Copyright (C) 2015 Matthew Waters <matthew@centricular.com>
+ * Copyright (C) 2018 NIITV. Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -41,11 +21,6 @@
  * License along with this library; if not, write to the
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
- *
- * GStreamer glsoundbar
- * Copyright (C) 2018 NIITV.
- * Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  */
 
@@ -106,7 +81,6 @@ struct _GstGLSoundbar
   GstAudioInfo ainfo;
 
   /* filter specific data */
-  gdouble *flt;
   GstGLFramebuffer *fbo;
   GstGLMemory *out_tex;
   GstGLDisplay *display;
@@ -139,10 +113,7 @@ struct _GstGLSoundbar
   gfloat audio_loud_speed;
   gfloat audio_peak_speed;
   gboolean bar_aspect_auto;
-  gfloat bg_color_r;
-  gfloat bg_color_g;
-  gfloat bg_color_b;
-  gfloat bg_color_a;
+  guint bg_color;
 
 };
 

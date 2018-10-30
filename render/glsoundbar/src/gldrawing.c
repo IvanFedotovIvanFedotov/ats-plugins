@@ -1,9 +1,9 @@
 /*
- * GStreamer gstgltestsrc
  * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
  * Copyright (C) 2002,2007 David A. Schleef <ds@schleef.org>
  * Copyright (C) 2008 Julien Isorce <julien.isorce@gmail.com>
  * Copyright (C) 2015 Matthew Waters <matthew@centricular.com>
+ * Copyright (C) 2018 NIITV. Ivan Fedotov<ivanfedotovmail@yandex.ru>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,16 +20,7 @@
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  *
- *
- * GStreamer glsoundbar
- * Copyright (C) 2018 NIITV.
- * Ivan Fedotov<ivanfedotovmail@yandex.ru>
- *
  */
-
-
-
-
 
 #include <gst/gst.h>
 #include "gstglsoundbar.h"
@@ -42,9 +33,7 @@
 
 
 
-//2 переменные должны быть оодинаковыми
-#define AUDIO_LEVELS (5)
-#define AUDIO_LEVELS_AS_STR "5"
+
 
 float audio_levels[AUDIO_LEVELS+1]={
     1.0,
@@ -54,8 +43,6 @@ float audio_levels[AUDIO_LEVELS+1]={
     0.53,//-37 dB
     0.0
 };
-
-float audio_levels_in_pixels[AUDIO_LEVELS+1];
 
 #define COLOR_AUDIO_LEVEL_0 "vec4(1.0,0.0,0.0,1.0)"
 #define COLOR_AUDIO_LEVEL_1 "vec4(1.0,0.8,0.0,1.0)"
@@ -82,6 +69,7 @@ static const gchar *bar3_fragment_to_up_src =
     "#ifdef GL_ES\n"
     "precision mediump float;\n"
     "#endif\n"
+    "int shaderup;"
     "uniform float audio_levels_in_pixels["AUDIO_LEVELS_AS_STR"+1];\n"
     "uniform int  bars_num;\n"
     "uniform vec4 bg_color;\n"
@@ -104,7 +92,7 @@ static const gchar *bar3_fragment_to_up_src =
     "varying vec2 out_uv;\n"
     "void main()\n"
     "{\n"
-    "   pos=floor(gl_FragCoord.x-bars_begin_pix);\n"
+    "   pos=gl_FragCoord.x-bars_begin_pix;\n"
     "   bar_pos=mod(pos,bar_step_pix);\n"
     "   bar_num=int(pos/bar_step_pix);\n"
     "   if(bar_num<0 || bar_num>=bars_num || bar_pos+1.0>bar_len_pix || pos<0.0){\n"
@@ -158,6 +146,7 @@ static const gchar *bar3_fragment_to_right_src =
     "#ifdef GL_ES\n"
     "precision mediump float;\n"
     "#endif\n"
+    "int shaderright;"
     "uniform float audio_levels_in_pixels["AUDIO_LEVELS_AS_STR"+1];\n"
     "uniform int  bars_num;\n"
     "uniform vec4 bg_color;\n"
@@ -180,7 +169,7 @@ static const gchar *bar3_fragment_to_right_src =
     "varying vec2 out_uv;\n"
     "void main()\n"
     "{\n"
-    "   pos=floor(gl_FragCoord.y-bars_begin_pix);\n"
+    "   pos=gl_FragCoord.y-bars_begin_pix;\n"
     "   bar_pos=mod(pos,bar_step_pix);\n"
     "   bar_num=int(pos/bar_step_pix);\n"
     "   if(bar_num<0 || bar_num>=bars_num || bar_pos+1.0>bar_len_pix || pos<0.0){\n"
@@ -279,7 +268,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
        horizontal_size_pix=src->pixel_width;
        vertical_size_pix=src->pixel_height;
        for(int i=0;i<AUDIO_LEVELS+1;i++){
-         audio_levels_in_pixels[i]=src->pixel_height*(1.0-audio_levels[i]);
+         src->audio_levels_in_pixels[i]=src->pixel_height*(1.0-audio_levels[i]);
        }
        break;
     case GLSOUND_BAR_DRAW_DIRECTION_TO_RIGHT:
@@ -287,7 +276,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
        horizontal_size_pix=src->pixel_height;
        vertical_size_pix=src->pixel_width;
        for(int i=0;i<AUDIO_LEVELS+1;i++){
-         audio_levels_in_pixels[i]=src->pixel_width*audio_levels[i];
+         src->audio_levels_in_pixels[i]=src->pixel_width*audio_levels[i];
        }
       break;
     default:
@@ -298,8 +287,8 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
 
   src->bar_len_pix=round(src->bar_aspect*horizontal_size_pix);
   src->bar_step_pix=round(src->bar_len_pix+(horizontal_size_pix-src->bar_len_pix*(channels))/(channels+2.0));
-  src->bars_begin_pix=round((horizontal_size_pix-src->bar_step_pix*channels)/2.0)+(src->bar_step_pix-src->bar_len_pix)/2.0;
-  src->bars_end_pix=src->bars_begin_pix+src->bar_step_pix*channels+(src->bar_step_pix-src->bar_len_pix)/2.0;
+  src->bars_begin_pix=round((horizontal_size_pix-src->bar_step_pix*channels)/2.0+(src->bar_step_pix-src->bar_len_pix)/2.0);
+  src->bars_end_pix=round(src->bars_begin_pix+src->bar_step_pix*channels+(src->bar_step_pix-src->bar_len_pix)/2.0);
   src->band_len_pix=round(src->band_len_percent*vertical_size_pix);
   src->band_distanse_pix=round(src->band_distanse_percent*vertical_size_pix);
   src->peak_len_pix=round(src->peak_height_percent*vertical_size_pix);
@@ -314,7 +303,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src, ResultData *audio
 
   shader_env_bind(context, &src->bar_shader);
 
-  gst_gl_shader_set_uniform_1fv(src->bar_shader.shader, "audio_levels_in_pixels", AUDIO_LEVELS+1, audio_levels_in_pixels);
+  gst_gl_shader_set_uniform_1fv(src->bar_shader.shader, "audio_levels_in_pixels", AUDIO_LEVELS+1, src->audio_levels_in_pixels);
   gst_gl_shader_set_uniform_1i(src->bar_shader.shader, "bars_num", src->bar_quads_num);
   gst_gl_shader_set_uniform_4f(src->bar_shader.shader, "bg_color", src->bg_color.R, src->bg_color.G, src->bg_color.B, src->bg_color.A);
   gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "width", src->pixel_width);
