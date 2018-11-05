@@ -82,7 +82,7 @@ gboolean shader_env_create(GstGLContext *context, struct ShaderEnv *src,
   gl->BufferData (GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_DYNAMIC_DRAW);
 
   gl->VertexAttribPointer (src->attributes_location, 4, GL_FLOAT, GL_FALSE, sizeof (GLfloat) * 4, (gpointer) (gintptr) 0);
-  gl->EnableVertexAttribArray (src->attributes_location);
+  //gl->EnableVertexAttribArray (src->attributes_location);
 
   gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
   gl->BindBuffer (GL_ARRAY_BUFFER, 0);
@@ -103,6 +103,8 @@ gboolean shader_env_bind(GstGLContext *context, struct ShaderEnv *src){
   gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, src->vbo_indices);
 
   gst_gl_shader_use (src->shader);
+
+  gl->EnableVertexAttribArray (src->attributes_location);
 
   return TRUE;
 
@@ -125,13 +127,15 @@ gboolean shader_env_unbind(GstGLContext *context, struct ShaderEnv *src){
   gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
   gl->BindBuffer (GL_ARRAY_BUFFER, 0);
 
+  gl->DisableVertexAttribArray (src->attributes_location);
+
   if(gl->GenVertexArrays){
     gl->BindVertexArray(0);
   }
 
   gst_gl_context_clear_shader(context);
 
-  gl->DisableVertexAttribArray (src->attributes_location);
+
 
 
   return TRUE;

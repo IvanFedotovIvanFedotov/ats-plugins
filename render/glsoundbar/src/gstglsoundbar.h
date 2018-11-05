@@ -87,13 +87,7 @@ struct _GstGLSoundbar
   GstGLContext *context, *other_context;
   gboolean gl_result;
 
-  // -- gl selection draw method
-  gpointer src_impl;
-  //GstClockTime running_time;
-  time_t prev_time;
-  time_t current_time;
-
-  gint64 timestamp_offset;              /* base offset */
+  /* base offset */
   GstClockTime running_time;            /* total running time */
   gint64 n_frames;
 
@@ -101,9 +95,6 @@ struct _GstGLSoundbar
 
   GlDrawing gl_drawing;
   gboolean gl_drawing_created;
-
-  GTimeVal gl_draw_timeprev;
-  GTimeVal gl_draw_timecurr;
 
   gint bars_draw_direction;
   gfloat bar_aspect;

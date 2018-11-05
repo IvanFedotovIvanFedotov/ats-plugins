@@ -93,7 +93,6 @@ G_DEFINE_TYPE (GstGLSoundbar, gst_glsoundbar, GST_TYPE_ELEMENT);
 
 struct _GstGLSoundbarPrivate
 {
-  gboolean negotiated;
 
   GstBufferPool *pool;
   gboolean pool_active;
@@ -107,23 +106,12 @@ struct _GstGLSoundbarPrivate
   GstAdapter *adapter;
 
   GstBuffer *inbuf;
-  GstBuffer *tempbuf;
-  GstVideoFrame tempframe;
 
   guint spf;                    // samples per video frame
   guint64 frame_duration;
 
-  // QoS stuff  |  with LOCK
-  gdouble proportion;
-  GstClockTime earliest_time;
-
-  guint dropped;                // frames dropped / not dropped
   guint processed;
 
-  // configuration mutex
-  GMutex config_lock;
-
-  GstSegment segment;
 
 };
 
@@ -179,12 +167,9 @@ static void
 gst_glsoundbar_reset (GstGLSoundbar * scope)
 {
   gst_adapter_clear (scope->priv->adapter);
-  gst_segment_init (&scope->priv->segment, GST_FORMAT_UNDEFINED);
 
   GST_OBJECT_LOCK (scope);
-  scope->priv->proportion = 1.0;
-  scope->priv->earliest_time = -1;
-  scope->priv->dropped = 0;
+
   scope->priv->processed = 0;
   GST_OBJECT_UNLOCK (scope);
 }
@@ -240,15 +225,6 @@ gst_glsoundbar_src_setcaps (GstGLSoundbar * scope, GstCaps * caps)
       gst_util_uint64_scale_int (GST_AUDIO_INFO_RATE (&scope->ainfo),
       GST_VIDEO_INFO_FPS_D (&info), GST_VIDEO_INFO_FPS_N (&info));
   scope->req_spf = scope->priv->spf;
-
-  if (scope->priv->tempbuf) {
-    gst_video_frame_unmap (&scope->priv->tempframe);
-    gst_buffer_unref (scope->priv->tempbuf);
-  }
-  scope->priv->tempbuf = gst_buffer_new_wrapped (g_malloc0 (scope->vinfo.size),
-      scope->vinfo.size);
-  gst_video_frame_map (&scope->priv->tempframe, &scope->vinfo,
-      scope->priv->tempbuf, GST_MAP_READWRITE);
 
   GST_DEBUG_OBJECT (scope, "video: dimension %dx%d, framerate %d/%d",
       GST_VIDEO_INFO_WIDTH (&info), GST_VIDEO_INFO_HEIGHT (&info),
@@ -484,7 +460,6 @@ default_decide_allocation (GstGLSoundbar * scope, GstQuery * query)
     return FALSE;
   }
 
-  src->timestamp_offset = 0;
   src->running_time = 0;
   src->n_frames = 0;
 
@@ -644,8 +619,6 @@ gst_gl_test_src_gl_stop (GstGLContext * context, GstGLSoundbar * src)
     src->gl_drawing_created=FALSE;
   }
 
-  src->src_impl = NULL;
-
 }
 
 
@@ -671,17 +644,6 @@ gst_glsoundbar_dispose (GObject * object)
     gst_buffer_unref (scope->priv->inbuf);
     scope->priv->inbuf = NULL;
   }
-  if (scope->priv->tempbuf) {
-    gst_video_frame_unmap (&scope->priv->tempframe);
-    gst_buffer_unref (scope->priv->tempbuf);
-    scope->priv->tempbuf = NULL;
-  }
-  if (scope->priv->config_lock.p) {
-    g_mutex_clear (&scope->priv->config_lock);
-    scope->priv->config_lock.p = NULL;
-  }
-
-  g_mutex_clear(&scope->priv->config_lock);
 
   G_OBJECT_CLASS (parent_class)->dispose (object);
 }
@@ -821,8 +783,6 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
 
   gst_adapter_push (scope->priv->adapter, buffer);
 
-  g_mutex_lock (&scope->priv->config_lock);
-
   // this is what we want
   sbpf = scope->req_spf * bpf;
 
@@ -835,8 +795,6 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
   GST_LOG_OBJECT (scope, "avail: %u, bpf: %u", avail, sbpf);
   while (avail >= sbpf) {
     GstBuffer *outbuf;
-    //GstVideoFrame outframe;
-
     // get timestamp of the current adapter content
     ts = gst_adapter_prev_pts (scope->priv->adapter, &dist);
     if (GST_CLOCK_TIME_IS_VALID (ts)) {
@@ -844,49 +802,9 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
       ts += gst_util_uint64_scale_int (dist, GST_SECOND, rate * bpf);
     }
 
-    // check for QoS, don't compute buffers that are known to be late
-    if (GST_CLOCK_TIME_IS_VALID (ts)) {
-      GstClockTime earliest_time;
-      gdouble proportion;
-      gint64 qostime;
-
-      qostime =
-          gst_segment_to_running_time (&scope->priv->segment,
-          GST_FORMAT_TIME, ts) + scope->priv->frame_duration;
-
-      GST_OBJECT_LOCK (scope);
-      earliest_time = scope->priv->earliest_time;
-      proportion = scope->priv->proportion;
-      GST_OBJECT_UNLOCK (scope);
-
-      if (GST_CLOCK_TIME_IS_VALID (earliest_time) && qostime <= earliest_time) {
-        GstClockTime stream_time, jitter;
-        GstMessage *qos_msg;
-
-        GST_DEBUG_OBJECT (scope,
-            "QoS: skip ts: %" GST_TIME_FORMAT ", earliest: %" GST_TIME_FORMAT,
-            GST_TIME_ARGS (qostime), GST_TIME_ARGS (earliest_time));
-
-        ++scope->priv->dropped;
-        stream_time = gst_segment_to_stream_time (&scope->priv->segment,
-            GST_FORMAT_TIME, ts);
-        jitter = GST_CLOCK_DIFF (qostime, earliest_time);
-        qos_msg = gst_message_new_qos (GST_OBJECT (scope), FALSE, qostime,
-            stream_time, ts, GST_BUFFER_DURATION (buffer));
-        gst_message_set_qos_values (qos_msg, jitter, proportion, 1000000);
-        gst_message_set_qos_stats (qos_msg, GST_FORMAT_BUFFERS,
-            scope->priv->processed, scope->priv->dropped);
-        gst_element_post_message (GST_ELEMENT (scope), qos_msg);
-
-        goto skip;
-      }
-    }
-
     ++scope->priv->processed;
 
-    g_mutex_unlock (&scope->priv->config_lock);
     ret = default_prepare_output_buffer (scope, &outbuf);
-    g_mutex_lock (&scope->priv->config_lock);
     // recheck as the value could have changed
     sbpf = scope->req_spf * bpf;
 
@@ -904,8 +822,6 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
     // this can fail as the data size we need could have changed
     if (!(adata = (gpointer) gst_adapter_map (scope->priv->adapter, sbpf)))
       break;
-
-    gst_gl_test_src_fill(scope, outbuf);
 
     gst_buffer_replace_all_memory (inbuf,
         gst_memory_new_wrapped (GST_MEMORY_FLAG_READONLY, adata, sbpf, 0,
@@ -928,12 +844,13 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
       goto audiosamplesbuf_proceed_error;
     }
 
-    g_mutex_unlock (&scope->priv->config_lock);
+    gst_gl_test_src_fill(scope, outbuf);
+
     ret = gst_pad_push (scope->priv->srcpad, outbuf);
     outbuf = NULL;
-    g_mutex_lock (&scope->priv->config_lock);
 
-  skip:
+//  skip:
+
     // recheck as the value could have changed
     sbpf = scope->req_spf * bpf;
     GST_LOG_OBJECT (scope, "avail: %u, bpf: %u", avail, sbpf);
@@ -952,8 +869,6 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
     if (ret != GST_FLOW_OK)
       break;
   }
-
-  g_mutex_unlock (&scope->priv->config_lock);
 
 beach:
   return ret;
@@ -986,33 +901,9 @@ gst_glsoundbar_src_event (GstPad * pad, GstObject * parent,
   gboolean res;
   GstGLSoundbar *scope;
 
-  //breakpoint_01//
   scope = GST_GLSOUNDBAR (parent);
 
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_QOS:
-    {
-      gdouble proportion;
-      GstClockTimeDiff diff;
-      GstClockTime timestamp;
-
-      gst_event_parse_qos (event, NULL, &proportion, &diff, &timestamp);
-
-      // save stuff for the _chain() function
-      GST_OBJECT_LOCK (scope);
-      scope->priv->proportion = proportion;
-      if (diff >= 0)
-        // we're late, this is a good estimate for next displayable
-        // frame (see part-qos.txt)
-        scope->priv->earliest_time = timestamp + 2 * diff +
-            scope->priv->frame_duration;
-      else
-        scope->priv->earliest_time = timestamp + diff;
-      GST_OBJECT_UNLOCK (scope);
-
-      res = gst_pad_push_event (scope->priv->sinkpad, event);
-      break;
-    }
     case GST_EVENT_RECONFIGURE:
       // dont't forward
       gst_event_unref (event);
@@ -1033,7 +924,6 @@ gst_glsoundbar_sink_event (GstPad * pad, GstObject * parent,
   gboolean res;
   GstGLSoundbar *scope;
 
-  //breakpoint_01//
   scope = GST_GLSOUNDBAR (parent);
 
   switch (GST_EVENT_TYPE (event)) {
@@ -1050,16 +940,6 @@ gst_glsoundbar_sink_event (GstPad * pad, GstObject * parent,
       gst_glsoundbar_reset (scope);
       res = gst_pad_push_event (scope->priv->srcpad, event);
       break;
-    case GST_EVENT_SEGMENT:
-    {
-      // the newsegment values are used to clip the input samples
-      // and to convert the incomming timestamps to running time so
-      // we can do QoS
-      gst_event_copy_segment (event, &scope->priv->segment);
-
-      res = gst_pad_push_event (scope->priv->srcpad, event);
-      break;
-    }
     default:
       res = gst_pad_event_default (pad, parent, event);
       break;
@@ -1075,54 +955,8 @@ gst_glsoundbar_src_query (GstPad * pad, GstObject * parent,
   gboolean res = FALSE;
   GstGLSoundbar *scope;
 
-  //breakpoint_01//
   scope = GST_GLSOUNDBAR (parent);
-
-
-
   switch (GST_QUERY_TYPE (query)) {
-
-    case GST_QUERY_LATENCY:
-    {
-      // We need to send the query upstream and add the returned latency to our
-      // own
-      GstClockTime min_latency, max_latency;
-      gboolean us_live;
-      GstClockTime our_latency;
-      guint max_samples;
-      gint rate = GST_AUDIO_INFO_RATE (&scope->ainfo);
-
-      if (rate == 0)
-        break;
-
-      if ((res = gst_pad_peer_query (scope->priv->sinkpad, query))) {
-        gst_query_parse_latency (query, &us_live, &min_latency, &max_latency);
-
-        GST_DEBUG_OBJECT (scope, "Peer latency: min %"
-            GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
-            GST_TIME_ARGS (min_latency), GST_TIME_ARGS (max_latency));
-
-        // the max samples we must buffer buffer
-        max_samples = MAX (scope->req_spf, scope->priv->spf);
-        our_latency = gst_util_uint64_scale_int (max_samples, GST_SECOND, rate);
-
-        GST_DEBUG_OBJECT (scope, "Our latency: %" GST_TIME_FORMAT,
-            GST_TIME_ARGS (our_latency));
-
-        // we add some latency but only if we need to buffer more than what
-        // upstream gives us
-        min_latency += our_latency;
-        if (max_latency != -1)
-          max_latency += our_latency;
-
-        GST_DEBUG_OBJECT (scope, "Calculated total latency : min %"
-            GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
-            GST_TIME_ARGS (min_latency), GST_TIME_ARGS (max_latency));
-
-        gst_query_set_latency (query, TRUE, min_latency, max_latency);
-      }
-      break;
-    }
     default:
       res = gst_pad_query_default (pad, parent, query);
       break;
@@ -1206,9 +1040,9 @@ gst_glsoundbar_set_property (GObject * object, guint prop_id,
     case PROP_BAR_RISC_STEP:
         scope->bar_risc_step=g_value_get_float(value);
       break;
-    case PROP_TIMESTAMP_OFFSET:
+/*    case PROP_TIMESTAMP_OFFSET:
         scope->timestamp_offset = g_value_get_int64 (value);
-      break;
+      break;*/
     case PROP_PEAK_HEIGHT_PIXELS:
         scope->peak_height=g_value_get_float(value);
       break;
@@ -1253,9 +1087,9 @@ gst_glsoundbar_get_property (GObject * object, guint prop_id,
     case PROP_BAR_RISC_STEP:
         g_value_set_float(value,scope->bar_risc_step);
       break;
-    case PROP_TIMESTAMP_OFFSET:
+/*    case PROP_TIMESTAMP_OFFSET:
         g_value_set_int64(value, scope->timestamp_offset);
-      break;
+      break;*/
     case PROP_PEAK_HEIGHT_PIXELS:
         g_value_set_float(value, scope->peak_height);
       break;
@@ -1278,6 +1112,7 @@ gst_glsoundbar_get_property (GObject * object, guint prop_id,
       break;
   }
 }
+
 
 
 static void
@@ -1307,13 +1142,11 @@ gst_glsoundbar_class_init (GstGLSoundbarClass * klass)
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_glsoundbar_change_state);
 
-  //gobject_class->finalize = gst_glsoundbar_finalize;
 
   gst_element_class_add_static_pad_template (gstelement_class,
       &gst_glsoundbar_src_template);
   gst_element_class_add_static_pad_template (gstelement_class,
       &gst_glsoundbar_sink_template);
-
 
   g_object_class_install_property
         (gobject_class, PROP_BARS_DIRECTION,
@@ -1370,13 +1203,13 @@ gst_glsoundbar_class_init (GstGLSoundbarClass * klass)
                           "0 - auto aspect disable, 1 - auto aspect enable",
                           0, 1, 1,
                           G_PARAM_READWRITE));
-
+/*
   g_object_class_install_property (gobject_class,
       PROP_TIMESTAMP_OFFSET, g_param_spec_int64 ("timestamp-offset",
           "Timestamp offset",
           "An offset added to timestamps set on buffers (in ns)", G_MININT64,
           G_MAXINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
+*/
   g_object_class_install_property
         (gobject_class, PROP_BG_COLOR_ARGB,
          g_param_spec_uint("bg-color-argb", "Backgound color ARGB",
@@ -1429,7 +1262,6 @@ gst_glsoundbar_init (GstGLSoundbar * filter)
   // reset the initial state
   gst_audio_info_init (&filter->ainfo);
   gst_video_info_init (&filter->vinfo);
-  g_mutex_init(&filter->priv->config_lock);
 
   filter->gl_drawing_created=FALSE;
 
@@ -1440,16 +1272,9 @@ gst_glsoundbar_init (GstGLSoundbar * filter)
   filter->other_context=NULL;
   filter->gl_result=FALSE;
 
-  filter->src_impl=NULL;
   filter->running_time = 0;
-  filter->timestamp_offset = 0;
+  //filter->timestamp_offset = 0;
   filter->n_frames = 0;
-
-  filter->current_time=time(0)*1000;
-  filter->prev_time=filter->current_time;
-
-  g_get_current_time(&filter->gl_draw_timeprev);
-  g_get_current_time(&filter->gl_draw_timecurr);
 
   filter->bars_draw_direction=GLSOUND_BAR_DRAW_DIRECTION_TO_UP;
   filter->bar_aspect=0.05;

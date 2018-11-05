@@ -108,6 +108,13 @@ gboolean audiosamplesbuf_create(AudioSamplesBuf * filter,
 gboolean audiosamplesbuf_set_data(AudioSamplesBuf * filter, GstAudioInfo *ainfo,
                                             gpointer *in_buf, gint in_buf_all_samples_num){
 
+
+  if(in_buf_all_samples_num>12*10000){
+    int a;
+    a=0;
+
+  }
+
   if(in_buf_all_samples_num / ainfo->channels > filter->frames_max){
     if(!filter->samples)g_free(filter->samples);
     filter->samples = g_new0 (gint16, in_buf_all_samples_num);
