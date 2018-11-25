@@ -44,7 +44,9 @@ void audiosamplesbuf_init(AudioSamplesBuf * filter){
   filter->converter=NULL;
   filter->flags=GST_AUDIO_CONVERTER_FLAG_NONE;
   filter->out_format=GST_AUDIO_FORMAT_UNKNOWN;
-  filter->options=NULL;
+  //filter->options=NULL;
+
+  filter->out_info=NULL;
 
   filter->result.channels=0;
 
@@ -60,15 +62,11 @@ void audiosamplesbuf_init(AudioSamplesBuf * filter){
 
 
 gboolean audiosamplesbuf_create(AudioSamplesBuf * filter,
-                                    GstAudioInfo *ainfo, GstVideoInfo *vinfo,
-                                    float audio_loud_speed, float audio_peak_speed){
+                                    GstAudioInfo *ainfo, GstVideoInfo *vinfo){
 
   int i;
 
   audiosamplesbuf_free(filter);
-
-  filter->audio_loud_speed=audio_loud_speed;
-  filter->audio_peak_speed=audio_peak_speed;
 
   filter->channels=ainfo->channels;
   filter->rate=ainfo->rate;
@@ -187,7 +185,7 @@ gboolean audiosamplesbuf_proceed(AudioSamplesBuf * filter){
   filter->timedelta_average=1.0/filter->video_fps;
   if(filter->timedelta_average<=0.0)return FALSE;
 
-  float speed=8.0*filter->audio_loud_speed;
+  float speed=8.0;
 
   for(i=0;i<filter->channels;i++){
     loud_average_i64[i]/=(gint64)filter->frames_num;
@@ -195,7 +193,7 @@ gboolean audiosamplesbuf_proceed(AudioSamplesBuf * filter){
     filter->loud_average[i]=(((1.0/filter->timedelta_average)/speed)*filter->loud_average[i]+
                              loud_average_val)/((1.0/filter->timedelta_average)/speed+1.0);
 
-    filter->loud_peak[i]-=filter->loud_peak[i]*0.03* filter->audio_peak_speed;
+    filter->loud_peak[i]-=filter->loud_peak[i]*0.03;
     if(filter->loud_peak[i]<filter->loud_average[i])filter->loud_peak[i]=filter->loud_average[i];
 
     if(filter->loud_average[i]<0.0)filter->loud_average[i]=0.0;
@@ -239,9 +237,6 @@ void audiosamplesbuf_free(AudioSamplesBuf * filter){
 
   if(filter->converter!=NULL)gst_audio_converter_free(filter->converter);
   filter->converter=NULL;
-
-  if(filter->options!=NULL)gst_structure_free(filter->options);
-  filter->options=NULL;
 
   audiosamplesbuf_init(filter);
 

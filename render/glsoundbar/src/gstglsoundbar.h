@@ -97,13 +97,7 @@ struct _GstGLSoundbar
   gboolean gl_drawing_created;
 
   gint bars_draw_direction;
-  gfloat bar_aspect;
-  gfloat bar_risc_len;
-  gfloat bar_risc_step;
-  gfloat peak_height;
-  gfloat audio_loud_speed;
-  gfloat audio_peak_speed;
-  gboolean bar_aspect_auto;
+
   guint bg_color;
 
 };

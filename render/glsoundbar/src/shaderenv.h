@@ -62,6 +62,8 @@ struct attribute
   guint stride;                 /* in bytes */
 };
 
+#define error_message_size 10000
+
 //Shader environment
 struct ShaderEnv
 {
@@ -87,8 +89,11 @@ struct ShaderEnv
 
   gint attributes_location;
 
+  gchar error_message[error_message_size];
 
 };
+
+void shader_env_first_init(struct ShaderEnv *src);
 gboolean shader_env_create(GstGLContext *context, struct ShaderEnv *src,
                            const gchar *vertex_shader_src, const gchar *fragment_shader_src);
 gboolean shader_env_bind(GstGLContext *context, struct ShaderEnv *src);
@@ -96,5 +101,7 @@ gboolean shader_env_data_set(GstGLContext *context, struct ShaderEnv *src);
 gboolean shader_env_draw(GstGLContext *context, struct ShaderEnv *src);
 gboolean shader_env_unbind(GstGLContext *context, struct ShaderEnv *src);
 gboolean shader_env_free(GstGLContext *context, struct ShaderEnv *src);
+
+void check_glerror(gchar *caption);
 
 #endif /* __GST_SHADERENV_H__ */

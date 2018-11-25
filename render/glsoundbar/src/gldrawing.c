@@ -1,4 +1,4 @@
-/*
+/* test
  * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
  * Copyright (C) 2002,2007 David A. Schleef <ds@schleef.org>
  * Copyright (C) 2008 Julien Isorce <julien.isorce@gmail.com>
@@ -222,14 +222,16 @@ static const gchar *bar3_fragment_to_right_src =
     "}";
 
 
+void gldraw_first_init(GlDrawing *src){
+
+  shader_env_first_init(&src->bar_shader);
+
+}
+
+
 gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result,
                       gint width, gint height,
                       gint direction,
-                      gfloat bar_aspect,
-                      gfloat bar_risc_len_percent,
-                      gfloat bar_risc_step_percent,
-                      gfloat peak_height_percent,
-                      gboolean bar_aspect_auto,
                       gfloat bg_color_r,
                       gfloat bg_color_g,
                       gfloat bg_color_b,
@@ -242,33 +244,38 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
   //вертикально относительно вертикального направления бара
   float vertical_size_pix;
 
+  int len;
+
+  memset(src->error_message, 0, error_message_size);
+
   src->bg_color.R=bg_color_r;
   src->bg_color.G=bg_color_g;
   src->bg_color.B=bg_color_b;
   src->bg_color.A=bg_color_a;
 
-  src->bar_aspect_auto=bar_aspect_auto;
   src->pixel_width=width;
   src->pixel_height=height;
   src->draw_direction=direction;
-  //src->draw_direction=1;
 
-  src->bar_aspect=bar_aspect;
-  if(src->bar_aspect_auto==TRUE && audio_proceess_result->channels>0){
-    src->bar_aspect=1.0/(float)audio_proceess_result->channels*0.7;
-  }
+  if(audio_proceess_result->channels<=0)return FALSE;
 
-  src->band_len_percent=bar_risc_len_percent;
-  src->band_distanse_percent=bar_risc_step_percent;
-  src->peak_height_percent=peak_height_percent;
+  src->bar_aspect=1.0/(float)audio_proceess_result->channels*0.7;
+  src->band_len_percent=0.022;
+  src->band_distanse_percent=0.028;
+  src->peak_height_percent=0.015;
 
   src->bar_quads_num=audio_proceess_result->channels;
 
   if((float)audio_proceess_result->channels<=0)return FALSE;
 
-  switch(src->draw_direction){
+
+   switch(src->draw_direction){
     case GLSOUND_BAR_DRAW_DIRECTION_TO_UP:
-       shader_env_create(context, &src->bar_shader, bar3_vertex_src, bar3_fragment_to_up_src);
+       if(shader_env_create(context, &src->bar_shader, bar3_vertex_src, bar3_fragment_to_up_src)==FALSE){
+         len=strlen(src->bar_shader.error_message);
+         if(len<error_message_size)memcpy(src->error_message, src->bar_shader.error_message, len);
+         return FALSE;
+       }
        horizontal_size_pix=src->pixel_width;
        vertical_size_pix=src->pixel_height;
        for(int i=0;i<AUDIO_LEVELS+1;i++){
@@ -276,7 +283,11 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
        }
        break;
     case GLSOUND_BAR_DRAW_DIRECTION_TO_RIGHT:
-       shader_env_create(context, &src->bar_shader, bar3_vertex_src, bar3_fragment_to_right_src);
+       if(shader_env_create(context, &src->bar_shader, bar3_vertex_src, bar3_fragment_to_right_src)==FALSE){
+         len=strlen(src->bar_shader.error_message);
+         if(len<error_message_size)memcpy(src->error_message, src->bar_shader.error_message, len);
+         return FALSE;
+       }
        horizontal_size_pix=src->pixel_height;
        vertical_size_pix=src->pixel_width;
        for(int i=0;i<AUDIO_LEVELS+1;i++){

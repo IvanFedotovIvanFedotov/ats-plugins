@@ -83,21 +83,18 @@ struct _GlDrawing
   gint pixel_width;
   gint pixel_height;
 
-  gboolean bar_aspect_auto;
   COLOR_COMPONENTS bg_color;
 
   float audio_levels_in_pixels[AUDIO_LEVELS+1];
 
+  gchar error_message[error_message_size];
+
 };
 
+void gldraw_first_init(GlDrawing *src);
 gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result,
                       gint width, gint height,
                       gint direction,
-                      gfloat bar_aspect,
-                      gfloat bar_risc_len_percent,
-                      gfloat bar_risc_step_percent,
-                      gfloat peak_height_percent,
-                      gboolean bar_aspect_auto,
                       gfloat bg_color_r,
                       gfloat bg_color_g,
                       gfloat bg_color_b,

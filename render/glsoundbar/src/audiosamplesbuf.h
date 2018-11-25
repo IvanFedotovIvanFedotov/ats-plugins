@@ -64,9 +64,6 @@ struct _AudioSamplesBuf
   float loud_average[64];
   float timedelta_average;
 
-  float audio_loud_speed;
-  float audio_peak_speed;
-
   //Максимальное количество сэмплов в буфере (на 1 канал)
   //размер массива samples[frames_max*channels]
   //
@@ -75,7 +72,7 @@ struct _AudioSamplesBuf
 
   GstAudioConverter *converter;
   GstAudioConverterFlags flags;
-  GstStructure *options;
+  //GstStructure *options;
 
   //То к чему должны преобразовываться входные сэмплы
   GstAudioInfo *out_info;
@@ -87,8 +84,7 @@ struct _AudioSamplesBuf
 
 void audiosamplesbuf_init(AudioSamplesBuf * filter);
 gboolean audiosamplesbuf_create(AudioSamplesBuf * filter,
-                                    GstAudioInfo *ainfo, GstVideoInfo *vinfo,
-                                    float audio_loud_speed, float audio_peak_speed);
+                                    GstAudioInfo *ainfo, GstVideoInfo *vinfo);
 gboolean audiosamplesbuf_set_data(AudioSamplesBuf * filter, GstAudioInfo *ainfo, gpointer *in_buf,
                                   gint in_buf_all_samples_num);
 gboolean audiosamplesbuf_proceed(AudioSamplesBuf * filter);

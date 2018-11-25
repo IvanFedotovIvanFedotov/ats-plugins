@@ -33,30 +33,39 @@
 
 
 
-gboolean shader_env_init_struct_fields(GstGLContext *context, struct ShaderEnv *src){
+gboolean shader_env_init_struct_fields(struct ShaderEnv *src){
 
-  src->shader=NULL;
   src->vao=-1;
   src->vbo=-1;
   src->vbo_indices=-1;
   src->attributes_location = -1;
+  memset(src->error_message, 0, error_message_size);
 
   return TRUE;
 
 }
+
+void shader_env_first_init(struct ShaderEnv *src){
+  src->shader=NULL;
+  shader_env_init_struct_fields(src);
+}
+
 
 gboolean shader_env_create(GstGLContext *context, struct ShaderEnv *src,
                            const gchar *vertex_shader_src, const gchar *fragment_shader_src){
 
   const GstGLFuncs *gl = context->gl_vtable;
   GError *error = NULL;
-  shader_env_init_struct_fields(context, src);
 
+  //shader_env_init_struct_fields(src);
+
+  shader_env_free(context,src);
 
   if(gl->GenVertexArrays){
     gl->GenVertexArrays (1, &src->vao);
     gl->BindVertexArray (src->vao);
   }
+
   gl->GenBuffers (1, &src->vbo);
   gl->GenBuffers (1, &src->vbo_indices);
 
@@ -72,15 +81,17 @@ gboolean shader_env_create(GstGLContext *context, struct ShaderEnv *src,
         GST_GLSL_VERSION_NONE,
         GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
         fragment_shader_src), NULL);
+
   if(!src->shader){
+    int len;
+    len=strlen(error->message);
+    if(len<error_message_size)memcpy(src->error_message, error->message, len);
     return FALSE;
   }
 
   src->attributes_location = gst_gl_shader_get_attribute_location (src->shader, "position");
-
   gl->BufferData (GL_ARRAY_BUFFER, 4 * sizeof(XYZW), positions, GL_STATIC_DRAW);
   gl->BufferData (GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_DYNAMIC_DRAW);
-
   gl->VertexAttribPointer (src->attributes_location, 4, GL_FLOAT, GL_FALSE, sizeof (GLfloat) * 4, (gpointer) (gintptr) 0);
   //gl->EnableVertexAttribArray (src->attributes_location);
 
@@ -91,6 +102,8 @@ gboolean shader_env_create(GstGLContext *context, struct ShaderEnv *src,
   return TRUE;
 
 }
+
+
 
 gboolean shader_env_bind(GstGLContext *context, struct ShaderEnv *src){
 
@@ -114,6 +127,9 @@ gboolean shader_env_draw(GstGLContext *context, struct ShaderEnv *src){
 
   const GstGLFuncs *gl = context->gl_vtable;
 
+  GLint viewport_dim[4] = { 0 };
+  gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
+
   gl->DrawElements (GL_TRIANGLES, 6 , GL_UNSIGNED_SHORT,(gpointer) (gintptr) 0);
 
   return TRUE;
@@ -135,9 +151,6 @@ gboolean shader_env_unbind(GstGLContext *context, struct ShaderEnv *src){
 
   gst_gl_context_clear_shader(context);
 
-
-
-
   return TRUE;
 
 }
@@ -146,19 +159,24 @@ gboolean shader_env_free(GstGLContext *context, struct ShaderEnv *src){
 
   const GstGLFuncs *gl = context->gl_vtable;
 
-  if (src->shader)
-    gst_object_unref (src->shader);
+  if(src->shader!=NULL){
+    gst_object_unref(src->shader);
+    src->shader=NULL;
+  }
 
-  if (src->vao)
+  if (src->vao){
     gl->DeleteVertexArrays (1, &src->vao);
+  }
 
-  if (src->vbo)
+  if (src->vbo){
     gl->DeleteBuffers (1, &src->vbo);
+  }
 
-  if (src->vbo_indices)
+  if (src->vbo_indices){
     gl->DeleteBuffers (1, &src->vbo_indices);
+  }
 
-  shader_env_init_struct_fields(context, src);
+  shader_env_init_struct_fields(src);
 
   return TRUE;
 
