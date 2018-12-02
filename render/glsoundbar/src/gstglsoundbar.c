@@ -47,7 +47,7 @@
 #include <gst/gl/gstglutils.h>
 
 #include <time.h>
-
+#include <math.h>
 #include <string.h>
 
 #include <gst/audio/audio.h>
@@ -56,7 +56,7 @@
 #include <gst/video/gstvideopool.h>
 
 #include "gstglsoundbar.h"
-#include "audiosamplesbuf.h"
+//#include "audiosamplesbuf.h"
 #include "gldrawing.h"
 
 
@@ -72,15 +72,7 @@ enum
 
   PROP_0,
   PROP_BARS_DIRECTION,
-  PROP_BAR_ASPECT,
-  PROP_BAR_RISC_LEN,
-  PROP_BAR_RISC_STEP,
-  PROP_PEAK_HEIGHT_PIXELS,
-  PROP_AUDIO_LOUD_SPEED,
-  PROP_AUDIO_PEAK_SPEED,
-  PROP_BAR_ASPECT_AUTO,
   PROP_BG_COLOR_ARGB,
-  PROP_TIMESTAMP_OFFSET,
   PROP_LAST
 
 };
@@ -112,7 +104,7 @@ struct _GstGLSoundbarPrivate
 
   guint processed;
 
-  GMutex config_lock;
+  //GMutex config_lock;
 
 
 };
@@ -134,6 +126,8 @@ GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("audio/x-raw, "
+        //"format", G_TYPE_STRING, "S16LE",
+        "format = (string) S16LE, "
         "layout = (string) interleaved"
         )
     );
@@ -165,7 +159,7 @@ static gboolean
     default_decide_allocation (GstGLSoundbar * scope, GstQuery * query);
 
 static void
-gst_gl_test_src_gl_stop (GstGLContext * context, GstGLSoundbar * src);
+gst_glsoundbar_gl_stop (GstGLContext * context, GstGLSoundbar * src);
 
 static gboolean
 _find_local_gl_context (GstGLSoundbar * src);
@@ -173,13 +167,15 @@ _find_local_gl_context (GstGLSoundbar * src);
 static void
 _src_generate_fbo_gl (GstGLContext * context, GstGLSoundbar * src);
 
-static gboolean
-gst_gl_test_src_init_shader (GstGLSoundbar * src);
+//static gboolean
+//gst_glsoundbar_init_shader (GstGLSoundbar * src);
 
 static gboolean
 gst_glsoundbar_set_allocation (GstGLSoundbar * scope,
     GstBufferPool * pool, GstAllocator * allocator,
     GstAllocationParams * params, GstQuery * query);
+
+gboolean evaluate_loudness (loudness *result, GstAudioInfo *ainfo, gpointer *buf, int buf_frames_num);
 
 
 static void
@@ -262,7 +258,7 @@ gst_glsoundbar_src_setcaps (GstGLSoundbar * scope, GstCaps * caps)
   // ERRORS
 wrong_caps:
   {
-    gst_caps_unref (caps);
+    //gst_caps_unref (caps);
     GST_DEBUG_OBJECT (scope, "error parsing caps");
     return FALSE;
   }
@@ -341,11 +337,22 @@ default_decide_allocation (GstGLSoundbar * scope, GstQuery * query)
   GError *error = NULL;
 
   if (scope->context){
-    gst_gl_context_thread_add (scope->context, (GstGLContextThreadFunc) gst_gl_test_src_gl_stop, scope);
+    gst_gl_context_thread_add (scope->context, (GstGLContextThreadFunc) gst_glsoundbar_gl_stop, scope);
   }
 
-  if(!audiosamplesbuf_create(&scope->audio_samples_buf, &scope->ainfo, &scope->vinfo))
-    goto wrong_audiosamplesbuf_create;
+
+  int i;
+  for(i=0;i<MAX_CHANNELS;i++){
+    scope->result.loud_average[i]=0.0;
+    scope->result.loud_peak[i]=0.0;
+    scope->result.loud_average_db[i]=0.0;
+    scope->result.loud_peak_db[i]=0.0;
+    scope->result.channels=scope->ainfo.channels;
+    scope->result.rate=scope->ainfo.rate;
+  }
+
+ // if(!audiosamplesbuf_create(&scope->audio_samples_buf, &scope->ainfo, &scope->vinfo))
+ //   goto wrong_audiosamplesbuf_create;
 
   if (!gst_gl_ensure_element_data (src, &src->display, &src->other_context)){
     return FALSE;
@@ -405,7 +412,13 @@ default_decide_allocation (GstGLSoundbar * scope, GstQuery * query)
   else
     gst_query_add_allocation_pool (query, pool, size, min, max);
 
-  gst_gl_test_src_init_shader (src);
+  //gst_glsoundbar_init_shader (src);
+  /*
+  if(!gst_gl_context_get_gl_api(src->context)){
+    return FALSE;
+  }
+  return TRUE;
+  */
 
 
   gst_object_unref (pool);
@@ -441,9 +454,8 @@ context_error:
 
     return FALSE;
   }
-wrong_audiosamplesbuf_create:
-
-    return FALSE;
+//wrong_audiosamplesbuf_create:
+//    return FALSE;
 
 }
 
@@ -541,8 +553,9 @@ no_format:
   }
 }
 
+/*
 static gboolean
-gst_gl_test_src_init_shader (GstGLSoundbar * src)
+gst_glsoundbar_init_shader (GstGLSoundbar * src)
 {
 
   if(!gst_gl_context_get_gl_api(src->context)){
@@ -550,14 +563,22 @@ gst_gl_test_src_init_shader (GstGLSoundbar * src)
   }
   return TRUE;
 }
+*/
 
 static gboolean
 _find_local_gl_context (GstGLSoundbar * src)
 {
 
-  if (gst_gl_query_local_gl_context (GST_ELEMENT (src), GST_PAD_SRC,
-          &src->context))
+  //<<<5
+  if (gst_gl_query_local_gl_context (GST_ELEMENT (src), GST_PAD_SRC,  &src->context)){
     return TRUE;
+  }
+
+  if (gst_gl_query_local_gl_context (GST_ELEMENT (src), GST_PAD_SINK,  &src->context)){
+    return TRUE;
+  }
+
+
   return FALSE;
 }
 
@@ -599,7 +620,7 @@ gst_glsoundbar_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_NULL:
 
       if (scope->context){
-        gst_gl_context_thread_add (scope->context, (GstGLContextThreadFunc) gst_gl_test_src_gl_stop, scope);
+        gst_gl_context_thread_add (scope->context, (GstGLContextThreadFunc) gst_glsoundbar_gl_stop, scope);
       }
 
       if(scope->context!=NULL){
@@ -644,7 +665,7 @@ gst_glsoundbar_change_state (GstElement * element,
 }
 
 static void
-gst_gl_test_src_gl_stop (GstGLContext * context, GstGLSoundbar * src)
+gst_glsoundbar_gl_stop (GstGLContext * context, GstGLSoundbar * src)
 {
 
   if (src->fbo){
@@ -653,11 +674,11 @@ gst_gl_test_src_gl_stop (GstGLContext * context, GstGLSoundbar * src)
   }
 
   if(src->gl_drawing_created==TRUE){
-    gldraw_close (src->context, &src->gl_drawing, &src->audio_samples_buf.result);
+    gldraw_close (src->context, &src->gl_drawing, &src->result);
     src->gl_drawing_created=FALSE;
   }
 
-  audiosamplesbuf_free(&src->audio_samples_buf);
+  //audiosamplesbuf_free(&src->audio_samples_buf);
 
 }
 
@@ -679,10 +700,10 @@ gst_glsoundbar_dispose (GObject * object)
     scope->priv->inbuf=NULL;
   }
 
-  if (scope->priv->config_lock.p) {
-    g_mutex_clear (&scope->priv->config_lock);
-    scope->priv->config_lock.p = NULL;
-  }
+  //if (scope->priv->config_lock.p) {
+  //  g_mutex_clear (&scope->priv->config_lock);
+  //  scope->priv->config_lock.p = NULL;
+  //}
 
   G_OBJECT_CLASS (parent_class)->dispose (object);
 
@@ -721,14 +742,23 @@ activate_failed:
   }
 }
 
+
+//draw speed test
+/*
+double srednee=0;
+double srednee_avg=0;
+double srednee_num=0;
+*/
+
+
 static gboolean
-gst_gl_test_src_callback (gpointer stuff)
+gst_glsoundbar_callback (gpointer stuff)
 {
   GstGLSoundbar *src = GST_GLSOUNDBAR (stuff);
 
-  gboolean res;
+  gboolean res=FALSE;
   float a,r,g,b;
-  //check_glerror("gst_gl_test_src_callback begin");
+
   if(src->gl_drawing_created==FALSE){
 
     a=(float)((src->bg_color & 0xff000000)>>24)/255.0;
@@ -736,21 +766,61 @@ gst_gl_test_src_callback (gpointer stuff)
     g=(float)((src->bg_color & 0x0000ff00)>>8)/255.0;
     b=(float)((src->bg_color & 0x000000ff))/255.0;
 
-    src->gl_result =  gldraw_init (src->context, &src->gl_drawing, &src->audio_samples_buf.result,
+    res =  gldraw_init (src->context, &src->gl_drawing, &src->result,
                                                 src->vinfo.width, src->vinfo.height,
                                                 src->bars_draw_direction,
                                                 r,g,b,a);
 
     src->gl_drawing_created=TRUE;
 
-    if(!src->gl_result) {
+    if(!res) {
       GST_ERROR (src, "Failed to initialize gldraw_init: \n %s",src->gl_drawing.error_message);
+      gldraw_close (src->context, &src->gl_drawing, &src->result);
+      src->gl_drawing_created=FALSE;
       return FALSE;
     }
 
-  }
+  }else {
 
-  res=gldraw_render (src->context, &src->gl_drawing, &src->audio_samples_buf.result);
+   res=gldraw_render (src->context, &src->gl_drawing, &src->result);
+
+/*
+      //draw speed test
+      GTimeVal t1,t2,td;
+
+      g_get_current_time(&t1);
+
+      int i;
+      for(i=0;i<10000;i++){
+
+      res=gldraw_render (src->context, &src->gl_drawing, &src->result);
+
+      g_get_current_time(&t2);
+
+      td.tv_sec=t2.tv_sec-t1.tv_sec;
+      td.tv_usec=t2.tv_usec-t1.tv_usec;
+      }
+
+      if(td.tv_usec>0){
+        srednee_num++;
+        srednee+=(double)td.tv_usec;
+        srednee_avg=srednee/srednee_num;
+      }
+
+      //test 1
+      //52.5 - clean shader
+      //123 - 3 if
+      //123 - formula y=k*x+b and one max and one int()
+
+      //test 2
+      //123 - audio_levels[6]/color_audio_levels[20] as macros
+      //173 - audio_levels[6]/color_audio_levels[20] as uniforms
+
+      int aa;
+      aa=0;
+*/
+
+  }
 
   return res;
 
@@ -761,12 +831,12 @@ _fill_gl (GstGLContext * context, GstGLSoundbar * src)
 {
 
   src->gl_result = gst_gl_framebuffer_draw_to_texture (src->fbo, src->out_tex,
-      gst_gl_test_src_callback, src);
+      gst_glsoundbar_callback, src);
 
 }
 
 static GstFlowReturn
-gst_gl_test_src_fill (GstGLSoundbar * psrc, GstBuffer * buffer)
+gst_glsoundbar_fill (GstGLSoundbar * psrc, GstBuffer * buffer)
 {
   GstGLSoundbar *src = psrc;
 
@@ -849,7 +919,7 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
 
   gst_adapter_push (scope->priv->adapter, buffer);
 
-  g_mutex_lock (&scope->priv->config_lock);
+  //g_mutex_lock (&scope->priv->config_lock);
 
   // this is what we want
   sbpf = scope->req_spf * bpf;
@@ -872,9 +942,9 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
 
     ++scope->priv->processed;
 
-    g_mutex_unlock (&scope->priv->config_lock);
+    //g_mutex_unlock (&scope->priv->config_lock);
     ret = default_prepare_output_buffer (scope, &outbuf);
-    g_mutex_lock (&scope->priv->config_lock);
+    //g_mutex_lock (&scope->priv->config_lock);
 
     // recheck as the value could have changed
     sbpf = scope->req_spf * bpf;
@@ -903,24 +973,34 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
 
     gst_buffer_map (inbuf, &amap, GST_MAP_READ);
 
-    if(!audiosamplesbuf_set_data(&scope->audio_samples_buf, &scope->ainfo,
-                    (gpointer *)amap.data, amap.size / scope->ainfo.bpf)){
-      goto audiosamplesbuf_set_data_error;
+    //if(!audiosamplesbuf_set_data(&scope->audio_samples_buf, &scope->ainfo,
+    //                (gpointer *)amap.data, amap.size / scope->ainfo.bpf)){
+    //  goto audiosamplesbuf_set_data_error;
+    //}
+
+    if(!evaluate_loudness (&scope->result, &scope->ainfo, (gpointer *)amap.data, amap.size / scope->ainfo.bpf)){
+      gst_buffer_unmap (inbuf, &amap);
+      goto audiosamplesbuf_proceed_error;
     }
+
 
     gst_buffer_unmap (inbuf, &amap);
     //get audio samples
 
-    if(!audiosamplesbuf_proceed(&scope->audio_samples_buf)){
-      goto audiosamplesbuf_proceed_error;
-    }
+    //if(!audiosamplesbuf_proceed(&scope->audio_samples_buf)){
+    //  goto audiosamplesbuf_proceed_error;
+    //}
 
-    gst_gl_test_src_fill(scope, outbuf);
 
-    g_mutex_unlock (&scope->priv->config_lock);
+
+
+
+    gst_glsoundbar_fill(scope, outbuf);
+
+    //g_mutex_unlock (&scope->priv->config_lock);
     ret = gst_pad_push (scope->priv->srcpad, outbuf);
     outbuf = NULL;
-    g_mutex_lock (&scope->priv->config_lock);
+    //g_mutex_lock (&scope->priv->config_lock);
 
 //  skip:
 
@@ -943,7 +1023,7 @@ gst_glsoundbar_chain (GstPad * pad, GstObject * parent,
       break;
   }
 
-  g_mutex_unlock (&scope->priv->config_lock);
+  //g_mutex_unlock (&scope->priv->config_lock);
 
 beach:
   return ret;
@@ -954,11 +1034,11 @@ not_negotiated:
     GST_DEBUG_OBJECT (scope, "Failed to renegotiate");
     return GST_FLOW_NOT_NEGOTIATED;
   }
-audiosamplesbuf_set_data_error:
-  {
-    GST_DEBUG_OBJECT (scope, "Failed to audiosamplesbuf_set_data");
-    return GST_FLOW_NOT_NEGOTIATED;
-  }
+//audiosamplesbuf_set_data_error:
+//  {
+//    GST_DEBUG_OBJECT (scope, "Failed to audiosamplesbuf_set_data");
+//    return GST_FLOW_NOT_NEGOTIATED;
+//  }
 audiosamplesbuf_proceed_error:
   {
     GST_DEBUG_OBJECT (scope, "Failed to audiosamplesbuf_proceed");
@@ -1040,12 +1120,15 @@ gst_glsoundbar_set_property (GObject * object, guint prop_id,
 
   GstGLSoundbar *scope = GST_GLSOUNDBAR (object);
 
+  float a,r,g,b;
+
   switch (prop_id) {
     case PROP_BARS_DIRECTION:
         scope->bars_draw_direction=g_value_get_int(value);
       break;
     case PROP_BG_COLOR_ARGB:
         scope->bg_color=g_value_get_uint(value);
+        setBGColor(&scope->gl_drawing, scope->bg_color);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1155,7 +1238,7 @@ gst_glsoundbar_init (GstGLSoundbar * filter)
 
   filter->priv = GST_GLSOUNDBAR_GET_PRIVATE (filter);
 
-  audiosamplesbuf_init(&filter->audio_samples_buf);
+  //audiosamplesbuf_init(&filter->audio_samples_buf);
 
   // create the sink and src pads
   pad_template =
@@ -1213,9 +1296,86 @@ gst_glsoundbar_init (GstGLSoundbar * filter)
 
   filter->bg_color=0xff000000;
 
-  g_mutex_init(&filter->priv->config_lock);
+  //g_mutex_init(&filter->priv->config_lock);
+
+  int i;
+  for(i=0;i<MAX_CHANNELS;i++){
+    filter->result.loud_average[i]=0.0;
+    filter->result.loud_peak[i]=0.0;
+    filter->result.loud_average_db[i]=0.0;
+    filter->result.loud_peak_db[i]=0.0;
+    filter->result.channels=0;
+    filter->result.rate=0;
+  }
+
+  int a;
+  a=0;
+}
+
+//S16LE
+gboolean evaluate_loudness (loudness *result, GstAudioInfo *ainfo, gpointer *buf, int buf_frames_num){
+
+  if(!buf || !ainfo || !result)return FALSE;
+  if(buf_frames_num<0)return FALSE;
+  if(buf_frames_num==0)return TRUE;
+  if(ainfo->rate<=0)return FALSE;
+
+  float loud_average_norm;
+
+  int i,fr;
+  long long loud_average[MAX_CHANNELS] = {0};
+
+  int volume_range;
+  float dV;
+  float average_fading=10.0;
+  float peak_fading=0.5;
+  float v;
+
+  volume_range=65536/2;
+  dV=((float)buf_frames_num)/((float)ainfo->rate);
+
+  //RMS loud loud_average_norm
+  for(i=0;i<ainfo->channels;i++){
+    for(fr=0;fr<buf_frames_num;fr++){
+      loud_average[i]+=(((signed short *)buf)[fr*ainfo->channels+i])*
+                       (((signed short *)buf)[fr*ainfo->channels+i]);
+    }
+
+    loud_average_norm=sqrt(((float)loud_average[i])/((float)buf_frames_num))/((float)volume_range);
+    result->loud_average[i]=(result->loud_average[i]+loud_average_norm*dV*average_fading)/(1.0+dV*average_fading);
+    result->loud_average[i]=CLAMP(result->loud_average[i],0.0,1.0);
+
+    //True peak
+/*
+    result->loud_peak[i]-=result->loud_peak[i]*dV*peak_fading;
+    for(fr=0;fr<buf_frames_num;fr++){
+      v=((float)abs(((signed short *)buf)[fr*ainfo->channels+i]))/((float)volume_range);
+      result->loud_peak[i]=MAX(result->loud_peak[i],v);
+    }
+    result->loud_peak[i]=CLAMP(result->loud_peak[i],0.0,1.0);
+*/
+
+    //RMS loud peak
+    result->loud_peak[i]-=result->loud_peak[i]*dV*peak_fading;
+    result->loud_peak[i]=MAX(result->loud_peak[i],result->loud_average[i]);
+    result->loud_peak[i]=CLAMP(result->loud_peak[i],0.0,1.0);
+
+
+    if(result->loud_average[i]>0.0000000001f)v=20.0*log10(result->loud_average[i]);
+    result->loud_average_db[i]=CLAMP(v/100.0+1.0,0.0,1.0);
+
+    if(result->loud_peak[i]>0.0000000001f)v=20.0*log10(result->loud_peak[i]);
+    result->loud_peak_db[i]=CLAMP(v/100.0+1.0,0.0,1.0);
+  }
+
+  return TRUE;
 
 }
+
+
+
+
+
 
 static gboolean
 glsoundbar_init (GstPlugin * glsoundbar)

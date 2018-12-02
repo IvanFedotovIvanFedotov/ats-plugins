@@ -14,14 +14,8 @@ clean: create_build_dir clean_build_dir
 install: clean build copy_lib_to_pluginsdir
 
 
-build: shaderenv.o audiosamplesbuf.o gstglsoundbar.o gldrawing.o
-	@$(CC) $(LDFLAGS) ../build/shaderenv.o ../build/audiosamplesbuf.o ../build/gstglsoundbar.o ../build/gldrawing.o -o ../build/libgstglsoundbar.so
-
-shaderenv.o:
-	@$(CC) $(CFLAGS) shaderenv.c -o ../build/shaderenv.o
-
-audiosamplesbuf.o:
-	@$(CC) $(CFLAGS) audiosamplesbuf.c -o ../build/audiosamplesbuf.o
+build: gstglsoundbar.o gldrawing.o
+	@$(CC) $(LDFLAGS) ../build/gstglsoundbar.o ../build/gldrawing.o -o ../build/libgstglsoundbar.so
 
 gstglsoundbar.o:
 	@$(CC) $(CFLAGS) gstglsoundbar.c -o ../build/gstglsoundbar.o
@@ -32,10 +26,8 @@ gldrawing.o:
 create_build_dir: 
 	mkdir -p ../build
 clean_build_dir: 
-	rm -f ../build/audiosamplesbuf.o
 	rm -f ../build/gstglsoundbar.o
 	rm -f ../build/gldrawing.o
-	rm -f ../build/shaderenv.o
 	rm -f ../build/libgstglsoundbar.so
 
 copy_lib_to_pluginsdir:

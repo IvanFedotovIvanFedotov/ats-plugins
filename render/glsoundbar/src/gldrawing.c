@@ -24,9 +24,6 @@
 
 #include <gst/gst.h>
 #include "gstglsoundbar.h"
-#include "audiosamplesbuf.h"
-
-#include "shaderenv.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -34,21 +31,44 @@
 
 
 
+//0
+//-6 dB
+//-24
+//-42
+//-60
+#define AUDIO_LEVELS \
+"float audio_levels [6];"\
+"audio_levels[0]=1.00;" \
+"audio_levels[1]=0.94;" \
+"audio_levels[2]=0.76;" \
+"audio_levels[3]=0.58;" \
+"audio_levels[4]=0.40;" \
+"audio_levels[5]=0.0;"
 
-float audio_levels[AUDIO_LEVELS+1]={
-    1.0,
-    0.90,//0 dB
-    0.84,//-6 dB
-    0.67,//-23 dB
-    0.53,//-37 dB
-    0.0
-};
 
-#define COLOR_AUDIO_LEVEL_0 "vec4(1.0,0.0,0.0,1.0)"
-#define COLOR_AUDIO_LEVEL_1 "vec4(1.0,0.8,0.0,1.0)"
-#define COLOR_AUDIO_LEVEL_2 "vec4(1.0,1.0,0.0,1.0)"
-#define COLOR_AUDIO_LEVEL_3 "vec4(0.0,1.0,0.0,1.0)"
-#define COLOR_AUDIO_LEVEL_4 "vec4(0.0,0.5,0.0,1.0)"
+
+#define COLOR_AUDIO_LEVELS \
+"vec4 color_audio_levels [5];"\
+"color_audio_levels[0]=vec4(1.0,0.0,0.0,1.0);" \
+"color_audio_levels[1]=vec4(1.0,1.0,0.0,1.0);" \
+"color_audio_levels[2]=vec4(0.0,1.0,0.0,1.0);" \
+"color_audio_levels[3]=vec4(0.0,0.6,0.0,1.0);" \
+"color_audio_levels[4]=vec4(0.0,0.45,0.0,1.0);" \
+
+
+
+/*
+float audio_levels [AUDIO_LEVELS+1]={1.00, 0.90, 0.84, 0.67, 0.53, 0.0};
+
+float color_audio_levels [AUDIO_LEVELS*4]= \
+{1.0,0.0,0.0,1.0, \
+ 1.0,0.8,0.0,1.0, \
+ 1.0,1.0,0.0,1.0, \
+ 0.0,1.0,0.0,1.0, \
+ 0.0,0.5,0.0,1.0};
+
+*/
+
 
 #define COLOR_PEAK "vec4(1.0,1.0,1.0,1.0)"
 
@@ -56,11 +76,9 @@ float audio_levels[AUDIO_LEVELS+1]={
 
 static const gchar *bar3_vertex_src =
     "attribute vec4 position;\n"
-    "varying vec2 out_uv;\n"
     "void main()\n"
     "{\n"
     "   gl_Position = position;\n"
-    "   out_uv = position.xy;\n"
     "}";
 
 
@@ -70,74 +88,73 @@ static const gchar *bar3_fragment_to_up_src =
     "precision mediump float;\n"
     "#endif\n"
     "int shaderup;"
-    "uniform float audio_levels_in_pixels["AUDIO_LEVELS_AS_STR"+1];\n"
     "uniform int  bars_num;\n"
     "uniform vec4 bg_color;\n"
     "uniform float width;\n"
     "uniform float height;\n"
-    "uniform float loud_average[64];"
-    "uniform float loud_peak[64];"
-    "uniform float bars_begin_pix;\n"
-    "uniform float bars_end_pix;\n"
-    "uniform float bar_len_pix;\n"
-    "uniform float bar_step_pix;\n"
-    "uniform float band_len_pix;\n"
-    "uniform float band_distanse_pix;\n"
-    "uniform float peak_len_pix;\n"
+    "uniform float loud_average_arr["MAX_CHANNELS_AS_STR"];"
+    "uniform float loud_peak_arr["MAX_CHANNELS_AS_STR"];"
+    "uniform float bars_begin;\n"
+    "uniform float bars_end;\n"
+    "uniform float bar_len;\n"
+    "uniform float bar_step;\n"
+    "uniform float band_len;\n"
+    "uniform float band_distanse;\n"
+    "uniform float peak_len;\n"
+//    "uniform float audio_levels["AUDIO_LEVELS_AS_STR"+1];\n"
+//    "uniform vec4 color_audio_levels["AUDIO_LEVELS_AS_STR"];\n"
     "int bar_num;\n"
     "float bar_pos;\n"
     "float pos;\n"
-    "float loud_average_pix;"
-    "float loud_peak_pix;"
+    "float loud_average;"
+    "float loud_peak;"
     "float y;"
-    "varying vec2 out_uv;\n"
     "void main()\n"
     "{\n"
-    "   pos=gl_FragCoord.x-bars_begin_pix;\n"
-    "   bar_pos=mod(pos,bar_step_pix);\n"
-    "   bar_num=int(pos/bar_step_pix);\n"
-    "   y=height-gl_FragCoord.y;\n"
-    "   if(bar_num<0 || bar_num>=bars_num || bar_pos+1.0>bar_len_pix || pos<0.0){\n"
+        AUDIO_LEVELS
+        COLOR_AUDIO_LEVELS
+    "   float coord_x;\n"
+    "   float coord_y;\n"
+    "   coord_x=gl_FragCoord.x/width;\n"
+    "   coord_y=gl_FragCoord.y/height;\n"
+    "   pos=coord_x-bars_begin;\n"
+    "   bar_pos=mod(pos,bar_step);\n"
+    "   bar_num=int(pos/bar_step);\n"
+    "   y=1.0-coord_y;\n"
+    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len || pos<0.0){"// || bar_pos+1.0>bar_len || pos<0.0){\n"
     "       gl_FragColor = bg_color;\n"
     "       return;\n"
     "   }\n"
-    "   loud_average_pix=(1.0-loud_average[bar_num])*height;\n"
-    "   loud_peak_pix=(1.0-loud_peak[bar_num])*height;\n"
-    "   if(loud_peak_pix<peak_len_pix)loud_peak_pix=peak_len_pix;\n"
-    "   if(gl_FragCoord.y+peak_len_pix>loud_peak_pix && gl_FragCoord.y<loud_peak_pix){\n"
+    "   loud_average=(1.0-loud_average_arr[bar_num]);\n"
+    "   loud_peak=(1.0-loud_peak_arr[bar_num]);\n"
+    "   loud_peak=max(loud_peak,peak_len);"
+    //"   if(loud_peak<peak_len)loud_peak=peak_len;\n"
+    "   if(coord_y+peak_len>loud_peak && coord_y<loud_peak){\n"
     "       gl_FragColor ="COLOR_PEAK";\n"
     "       return;\n"
     "   }\n"
-    "   if(gl_FragCoord.y>loud_average_pix){\n"
-    "       if(gl_FragCoord.y<audio_levels_in_pixels[1]){\n"
-    "         if(mod(y,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_0";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.y<audio_levels_in_pixels[2]){\n"
-    "         if(mod(y,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_1";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.y<audio_levels_in_pixels[3]){\n"
-    "         if(mod(y,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_2";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.y<audio_levels_in_pixels[4]){\n"
-    "         if(mod(y,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_3";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.y<audio_levels_in_pixels[5]){\n"
-    "         if(mod(y,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_4";\n"
-    "           return;\n"
-    "         }\n"
+    "   if(coord_y>loud_average){\n"
+    "       int index=0;"
+/*  speed test - 123ms (10k shader runs (average ~300 runs)):
+    "       float indexf=0.0;"
+    "       indexf=2.1*indexf+1.1;"
+    "       indexf=max(indexf,0.0);"
+    "       index=int(indexf);"
+*/
+//  speed test. - 123ms:
+    "       if(y>audio_levels[2]){"
+    "         if(y>audio_levels[1])index=0;"
+    "         else index=1;"
+    "       }else{"
+    "         if(y>audio_levels[3])index=2;"
+    "         else {"
+    "           if(y>audio_levels[4])index=3;"
+    "           else index=4;"
+    "         }"
+    "       }"
+    "       if(mod(y,band_distanse)<band_len){\n"
+    "         gl_FragColor=color_audio_levels[index];\n"
+    "         return;\n"
     "       }\n"
     "   }\n"
     "   gl_FragColor = bg_color;\n"
@@ -150,72 +167,65 @@ static const gchar *bar3_fragment_to_right_src =
     "precision mediump float;\n"
     "#endif\n"
     "int shaderright;"
-    "uniform float audio_levels_in_pixels["AUDIO_LEVELS_AS_STR"+1];\n"
+    //"uniform float audio_levels["AUDIO_LEVELS_AS_STR"+1];\n"
     "uniform int  bars_num;\n"
     "uniform vec4 bg_color;\n"
     "uniform float width;\n"
     "uniform float height;\n"
-    "uniform float loud_average[64];"
-    "uniform float loud_peak[64];"
-    "uniform float bars_begin_pix;\n"
-    "uniform float bars_end_pix;\n"
-    "uniform float bar_len_pix;\n"
-    "uniform float bar_step_pix;\n"
-    "uniform float band_len_pix;\n"
-    "uniform float band_distanse_pix;\n"
-    "uniform float peak_len_pix;\n"
+    "uniform float loud_average_arr["MAX_CHANNELS_AS_STR"];"
+    "uniform float loud_peak_arr["MAX_CHANNELS_AS_STR"];"
+    "uniform float bars_begin;\n"
+    "uniform float bars_end;\n"
+    "uniform float bar_len;\n"
+    "uniform float bar_step;\n"
+    "uniform float band_len;\n"
+    "uniform float band_distanse;\n"
+    "uniform float peak_len;\n"
+//    "uniform float audio_levels["AUDIO_LEVELS_AS_STR"+1];\n"
+//    "uniform vec4 color_audio_levels["AUDIO_LEVELS_AS_STR"];\n"
     "int bar_num;\n"
     "float bar_pos;\n"
     "float pos;\n"
-    "float loud_average_pix;\n"
-    "float loud_peak_pix;\n"
-    "varying vec2 out_uv;\n"
+    "float loud_average;\n"
+    "float loud_peak;\n"
     "void main()\n"
     "{\n"
-    "   pos=gl_FragCoord.y-bars_begin_pix;\n"
-    "   bar_pos=mod(pos,bar_step_pix);\n"
-    "   bar_num=int(pos/bar_step_pix);\n"
-    "   if(bar_num<0 || bar_num>=bars_num || bar_pos+1.0>bar_len_pix || pos<0.0){\n"
+        AUDIO_LEVELS
+        COLOR_AUDIO_LEVELS
+    "   float coord_x;\n"
+    "   float coord_y;\n"
+    "   coord_x=gl_FragCoord.x/width;\n"
+    "   coord_y=gl_FragCoord.y/height;\n"
+    "   pos=coord_y-bars_begin;\n"
+    "   bar_pos=mod(pos,bar_step);\n"
+    "   bar_num=int(pos/bar_step);\n"
+    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len || pos<0.0){\n"
     "       gl_FragColor = bg_color;\n"
     "       return;\n"
     "   }\n"
-    "   loud_average_pix=loud_average[bar_num]*width;\n"
-    "   loud_peak_pix=loud_peak[bar_num]*width;\n"
-    "   if(loud_peak_pix<peak_len_pix)loud_peak_pix=peak_len_pix;\n"
-    "   if(gl_FragCoord.x<loud_peak_pix && gl_FragCoord.x>loud_peak_pix-peak_len_pix){\n"
+    "   loud_average=loud_average_arr[bar_num];\n"
+    "   loud_peak=loud_peak_arr[bar_num];\n"
+    //"   if(loud_peak<peak_len)loud_peak=peak_len;\n"
+    "   loud_peak=max(loud_peak,peak_len);"
+    "   if(coord_x<loud_peak && coord_x>loud_peak-peak_len){\n"
     "       gl_FragColor ="COLOR_PEAK";\n"
     "       return;\n"
     "   }\n"
-    "   if(gl_FragCoord.x<loud_average_pix){\n"
-    "       if(gl_FragCoord.x>audio_levels_in_pixels[1]){\n"
-    "         if(mod(gl_FragCoord.x,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_0";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.x>audio_levels_in_pixels[2]){\n"
-    "         if(mod(gl_FragCoord.x,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_1";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.x>audio_levels_in_pixels[3]){\n"
-    "         if(mod(gl_FragCoord.x,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_2";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.x>audio_levels_in_pixels[4]){\n"
-    "         if(mod(gl_FragCoord.x,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_3";\n"
-    "           return;\n"
-    "         }\n"
-    "       }\n"
-    "       if(gl_FragCoord.x>audio_levels_in_pixels[5]){\n"
-    "         if(mod(gl_FragCoord.x,band_distanse_pix)<band_len_pix){\n"
-    "           gl_FragColor="COLOR_AUDIO_LEVEL_4";\n"
-    "           return;\n"
-    "         }\n"
+    "   if(coord_x<loud_average){\n"
+    "       int index=0;"
+    "       if(coord_x>audio_levels[2]){"
+    "         if(coord_x>audio_levels[1])index=0;"
+    "         else index=1;"
+    "       }else{"
+    "         if(coord_x>audio_levels[3])index=2;"
+    "         else {"
+    "           if(coord_x>audio_levels[4])index=3;"
+    "           else index=4;"
+    "         }"
+    "       }"
+    "       if(mod(coord_x,band_distanse)<band_len){\n"
+    "         gl_FragColor=color_audio_levels[index];\n"
+    "         return;\n"
     "       }\n"
     "   }\n"
     "   gl_FragColor = bg_color;\n"
@@ -224,18 +234,34 @@ static const gchar *bar3_fragment_to_right_src =
 
 void gldraw_first_init(GlDrawing *src){
 
-  shader_env_first_init(&src->bar_shader);
+  //shader_env_first_init(&src->bar_shader);
+
+  src->shader=NULL;
+  src->vao=0;
+  src->vbo=0;
+  src->vbo_indices=0;
+  src->attributes_location = 0;
+  memset(src->error_message, 0, error_message_size);
 
 }
 
 
-gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result,
-                      gint width, gint height,
-                      gint direction,
-                      gfloat bg_color_r,
-                      gfloat bg_color_g,
-                      gfloat bg_color_b,
-                      gfloat bg_color_a)
+void setBGColor(GlDrawing *src, unsigned int color){
+
+  src->bg_color.R=(float)((color & 0x00ff0000)>>16)/255.0;
+  src->bg_color.G=(float)((color & 0x0000ff00)>>8)/255.0;
+  src->bg_color.B=(float)((color & 0x000000ff))/255.0;
+  src->bg_color.A=(float)((color & 0xff000000)>>24)/255.0;
+
+}
+
+gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result,
+                      int width, int height,
+                      int direction,
+                      float bg_color_r,
+                      float bg_color_g,
+                      float bg_color_b,
+                      float bg_color_a)
 {
 
   float channels;
@@ -246,6 +272,14 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
 
   int len;
 
+  const GstGLFuncs *gl = context->gl_vtable;
+
+  GError *error = NULL;
+
+  gboolean ret;
+
+  ret=TRUE;
+
   memset(src->error_message, 0, error_message_size);
 
   src->bg_color.R=bg_color_r;
@@ -253,97 +287,201 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_
   src->bg_color.B=bg_color_b;
   src->bg_color.A=bg_color_a;
 
-  src->pixel_width=width;
-  src->pixel_height=height;
+  src->width=width;
+  src->height=height;
   src->draw_direction=direction;
 
   if(audio_proceess_result->channels<=0)return FALSE;
 
   src->bar_aspect=1.0/(float)audio_proceess_result->channels*0.7;
-  src->band_len_percent=0.022;
-  src->band_distanse_percent=0.028;
-  src->peak_height_percent=0.015;
+  src->band_len_percent=0.016;
+  src->band_distanse_percent=0.020;
+  src->peak_height_percent=0.004;
 
   src->bar_quads_num=audio_proceess_result->channels;
 
   if((float)audio_proceess_result->channels<=0)return FALSE;
 
 
-   switch(src->draw_direction){
+
+  channels=(float)audio_proceess_result->channels;
+
+  src->bar_len=src->bar_aspect;
+  src->bar_step=src->bar_len+(1.0-src->bar_len*(channels))/(channels+2.0);
+  src->bars_begin=(1.0-src->bar_step*channels)/2.0+(src->bar_step-src->bar_len)/2.0;
+  src->bars_end=src->bars_begin+src->bar_step*channels+(src->bar_step-src->bar_len)/2.0;
+  src->band_len=src->band_len_percent*2.0;
+  src->band_distanse=src->band_distanse_percent*2.0;
+  src->peak_len=src->peak_height_percent*2.0;
+
+
+  //-------------
+
+
+
+/*
+  //free
+  if(src->shader!=NULL){
+    gst_object_unref(src->shader);
+    src->shader=NULL;
+  }
+
+  if (src->vao){
+    gl->DeleteVertexArrays (1, &src->vao);
+  }
+
+  if (src->vbo){
+    gl->DeleteBuffers (1, &src->vbo);
+  }
+
+  if (src->vbo_indices){
+    gl->DeleteBuffers (1, &src->vbo_indices);
+  }
+
+  src->vao=-1;
+  src->vbo=-1;
+  src->vbo_indices=-1;
+  src->attributes_location = -1;
+  memset(src->error_message, 0, error_message_size);
+  //free
+*/
+
+
+  if(gl->GenVertexArrays){
+    gl->GenVertexArrays (1, &src->vao);
+    gl->BindVertexArray (src->vao);
+  }
+
+  gl->GenBuffers (1, &src->vbo);
+  gl->GenBuffers (1, &src->vbo_indices);
+
+  gl->BindBuffer (GL_ARRAY_BUFFER, src->vbo);
+  gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, src->vbo_indices);
+
+  switch(src->draw_direction){
     case GLSOUND_BAR_DRAW_DIRECTION_TO_UP:
-       if(shader_env_create(context, &src->bar_shader, bar3_vertex_src, bar3_fragment_to_up_src)==FALSE){
-         len=strlen(src->bar_shader.error_message);
-         if(len<error_message_size)memcpy(src->error_message, src->bar_shader.error_message, len);
-         return FALSE;
-       }
-       horizontal_size_pix=src->pixel_width;
-       vertical_size_pix=src->pixel_height;
-       for(int i=0;i<AUDIO_LEVELS+1;i++){
-         src->audio_levels_in_pixels[i]=src->pixel_height*(1.0-audio_levels[i]);
-       }
+      src->shader = gst_gl_shader_new_link_with_stages (context, &error,
+        gst_glsl_stage_new_with_string (context, GL_VERTEX_SHADER,
+          GST_GLSL_VERSION_NONE,
+          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
+          bar3_vertex_src),
+        gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
+          GST_GLSL_VERSION_NONE,
+          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
+          bar3_fragment_to_up_src), NULL);
        break;
     case GLSOUND_BAR_DRAW_DIRECTION_TO_RIGHT:
-       if(shader_env_create(context, &src->bar_shader, bar3_vertex_src, bar3_fragment_to_right_src)==FALSE){
-         len=strlen(src->bar_shader.error_message);
-         if(len<error_message_size)memcpy(src->error_message, src->bar_shader.error_message, len);
-         return FALSE;
-       }
-       horizontal_size_pix=src->pixel_height;
-       vertical_size_pix=src->pixel_width;
-       for(int i=0;i<AUDIO_LEVELS+1;i++){
-         src->audio_levels_in_pixels[i]=src->pixel_width*audio_levels[i];
-       }
+      src->shader = gst_gl_shader_new_link_with_stages (context, &error,
+        gst_glsl_stage_new_with_string (context, GL_VERTEX_SHADER,
+          GST_GLSL_VERSION_NONE,
+          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
+          bar3_vertex_src),
+        gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
+          GST_GLSL_VERSION_NONE,
+          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
+          bar3_fragment_to_right_src), NULL);
       break;
     default:
     break;
   }
 
-  channels=(float)audio_proceess_result->channels;
+  if(!src->shader){
+    int len;
+    len=strlen(error->message);
+    if(len<error_message_size)memcpy(src->error_message, error->message, len);
+    ret=FALSE;
+  }
 
-  src->bar_len_pix=round(src->bar_aspect*horizontal_size_pix);
-  src->bar_step_pix=round(src->bar_len_pix+(horizontal_size_pix-src->bar_len_pix*(channels))/(channels+2.0));
-  src->bars_begin_pix=round((horizontal_size_pix-src->bar_step_pix*channels)/2.0+(src->bar_step_pix-src->bar_len_pix)/2.0);
-  src->bars_end_pix=round(src->bars_begin_pix+src->bar_step_pix*channels+(src->bar_step_pix-src->bar_len_pix)/2.0);
-  src->band_len_pix=round(src->band_len_percent*vertical_size_pix);
-  src->band_distanse_pix=round(src->band_distanse_percent*vertical_size_pix);
-  src->peak_len_pix=round(src->peak_height_percent*vertical_size_pix);
+  src->attributes_location = gst_gl_shader_get_attribute_location (src->shader, "position");
+  gl->BufferData (GL_ARRAY_BUFFER, 4 * sizeof(XYZW), positions, GL_STATIC_DRAW);
+  gl->BufferData (GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_DYNAMIC_DRAW);
+  gl->VertexAttribPointer (src->attributes_location, 4, GL_FLOAT, GL_FALSE, sizeof (GLfloat) * 4, (gpointer) (gintptr) 0);
+  //gl->EnableVertexAttribArray (src->attributes_location);
 
-  return TRUE;
+  gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
+  gl->BindBuffer (GL_ARRAY_BUFFER, 0);
+  gl->BindVertexArray (0);
+
+  return ret;
 }
 
-gboolean gldraw_render(GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result)
+
+
+
+gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result)
 {
 
   if(audio_proceess_result->channels<=0)return FALSE;
+/*
+  int k;
+  for(k=0;k<64;k++){
+    audio_proceess_result->loud_average_db[k]=1.0;
+    audio_proceess_result->loud_peak_db[k]=1.0;
+  }
+*/
+  const GstGLFuncs *gl = context->gl_vtable;
+  if(gl->GenVertexArrays){
+    gl->BindVertexArray (src->vao);
+  }
+  gl->BindBuffer (GL_ARRAY_BUFFER, src->vbo);
+  gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, src->vbo_indices);
+  gst_gl_shader_use (src->shader);
+  gl->EnableVertexAttribArray (src->attributes_location);
 
-  shader_env_bind(context, &src->bar_shader);
 
-  gst_gl_shader_set_uniform_1fv(src->bar_shader.shader, "audio_levels_in_pixels", AUDIO_LEVELS+1, src->audio_levels_in_pixels);
-  gst_gl_shader_set_uniform_1i(src->bar_shader.shader, "bars_num", src->bar_quads_num);
-  gst_gl_shader_set_uniform_4f(src->bar_shader.shader, "bg_color", src->bg_color.R, src->bg_color.G, src->bg_color.B, src->bg_color.A);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "width", src->pixel_width);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "height", src->pixel_height);
-  gst_gl_shader_set_uniform_1fv(src->bar_shader.shader, "loud_average", src->bar_quads_num, (float *)audio_proceess_result->loud_average);
-  gst_gl_shader_set_uniform_1fv(src->bar_shader.shader, "loud_peak", src->bar_quads_num, (float *)audio_proceess_result->loud_peak);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "bars_begin_pix",src->bars_begin_pix);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "bars_end_pix",src->bars_end_pix);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "bar_len_pix",src->bar_len_pix);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "bar_step_pix",src->bar_step_pix);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "band_len_pix",src->band_len_pix);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "band_distanse_pix",src->band_distanse_pix);
-  gst_gl_shader_set_uniform_1f(src->bar_shader.shader, "peak_len_pix",src->peak_len_pix);
+  //gst_gl_shader_set_uniform_1fv(src->shader, "audio_levels", AUDIO_LEVELS+1, audio_levels);
+  gst_gl_shader_set_uniform_1i(src->shader, "bars_num", src->bar_quads_num);
+  gst_gl_shader_set_uniform_4f(src->shader, "bg_color", src->bg_color.R, src->bg_color.G, src->bg_color.B, src->bg_color.A);
+  gst_gl_shader_set_uniform_1f(src->shader, "width", src->width);
+  gst_gl_shader_set_uniform_1f(src->shader, "height", src->height);
+  gst_gl_shader_set_uniform_1fv(src->shader, "loud_average_arr", src->bar_quads_num, (float *)audio_proceess_result->loud_average_db);
+  gst_gl_shader_set_uniform_1fv(src->shader, "loud_peak_arr", src->bar_quads_num, (float *)audio_proceess_result->loud_peak_db);
+  gst_gl_shader_set_uniform_1f(src->shader, "bars_begin",src->bars_begin);
+  gst_gl_shader_set_uniform_1f(src->shader, "bars_end",src->bars_end);
+  gst_gl_shader_set_uniform_1f(src->shader, "bar_len",src->bar_len);
+  gst_gl_shader_set_uniform_1f(src->shader, "bar_step",src->bar_step);
+  gst_gl_shader_set_uniform_1f(src->shader, "band_len",src->band_len);
+  gst_gl_shader_set_uniform_1f(src->shader, "band_distanse",src->band_distanse);
+  gst_gl_shader_set_uniform_1f(src->shader, "peak_len",src->peak_len);
+//  gst_gl_shader_set_uniform_1fv(src->shader, "audio_levels", MAX_CHANNELS+1, audio_levels);
+//  gst_gl_shader_set_uniform_4fv(src->shader, "color_audio_levels", MAX_CHANNELS*4, color_audio_levels);
 
-  shader_env_draw(context, &src->bar_shader);
-  shader_env_unbind(context, &src->bar_shader);
+
+  gl->DrawElements (GL_TRIANGLES, 6 , GL_UNSIGNED_SHORT,(gpointer) (gintptr) 0);
+
+
+  gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
+  gl->BindBuffer (GL_ARRAY_BUFFER, 0);
+  gl->DisableVertexAttribArray (src->attributes_location);
+  if(gl->GenVertexArrays){
+    gl->BindVertexArray(0);
+  }
+  gst_gl_context_clear_shader(context);
+
 
   return TRUE;
 
 }
 
-void gldraw_close (GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result)
+void gldraw_close (GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result)
 {
 
-  shader_env_free(context, &src->bar_shader);
+  const GstGLFuncs *gl = context->gl_vtable;
+
+  if(src->shader!=NULL){
+    gst_object_unref(src->shader);
+    src->shader=NULL;
+  }
+
+  gl->DeleteVertexArrays (1, &src->vao);
+  gl->DeleteBuffers (1, &src->vbo);
+  gl->DeleteBuffers (1, &src->vbo_indices);
+
+  src->vao=0;
+  src->vbo=0;
+  src->vbo_indices=0;
+  src->attributes_location = 0;
+  memset(src->error_message, 0, error_message_size);
 
 }
 

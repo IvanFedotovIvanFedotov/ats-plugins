@@ -35,8 +35,10 @@
 
 #include <gst/gl/gl.h>
 
-#include "audiosamplesbuf.h"
+//#include "audiosamplesbuf.h"
 #include "gldrawing.h"
+
+
 
 
 
@@ -56,10 +58,12 @@ G_BEGIN_DECLS
 #define GST_IS_GLSOUNDBAR_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_GLSOUNDBAR))
 
+
+
+
 typedef struct _GstGLSoundbar      GstGLSoundbar;
 typedef struct _GstGLSoundbarClass GstGLSoundbarClass;
 typedef struct _GstGLSoundbarPrivate GstGLSoundbarPrivate;
-
 
 enum {
 
@@ -89,16 +93,24 @@ struct _GstGLSoundbar
 
   /* base offset */
   GstClockTime running_time;            /* total running time */
-  gint64 n_frames;
+  long long n_frames;
 
-  AudioSamplesBuf audio_samples_buf;
+  //AudioSamplesBuf audio_samples_buf;
 
   GlDrawing gl_drawing;
   gboolean gl_drawing_created;
 
-  gint bars_draw_direction;
+  int bars_draw_direction;
 
-  guint bg_color;
+  unsigned int bg_color;
+
+  //audio
+
+  loudness result;
+
+
+
+
 
 };
 

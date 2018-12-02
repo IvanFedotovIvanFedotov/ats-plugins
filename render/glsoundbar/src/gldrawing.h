@@ -25,40 +25,93 @@
 #ifndef __GLDRAWING_H__
 #define __GLDRAWING_H__
 
-#include "shaderenv.h"
+//#include "shaderenv.h"
 
+#include <glib.h>
+#include <gst/gl/gl.h>
+#include <gst/gl/gstglfuncs.h>
+
+
+
+//2 переменные должны быть оодинаковыми
+#define MAX_CHANNELS 64
+#define MAX_CHANNELS_AS_STR "64"
+
+typedef struct {
+
+  int channels;
+  int rate;
+  float loud_average[MAX_CHANNELS];
+  float loud_peak[MAX_CHANNELS];
+  float loud_average_db[MAX_CHANNELS];
+  float loud_peak_db[MAX_CHANNELS];
+
+}loudness;
 
 //2 переменные должны быть оодинаковыми
 #define AUDIO_LEVELS (5)
 #define AUDIO_LEVELS_AS_STR "5"
 
-typedef struct _RECT_INT RECT_INT;
-struct _RECT_INT{
+#define MAX_ATTRIBUTES 4
 
-  gint x1,y1,x2,y2;
+#define error_message_size 1000
 
-};
-
-typedef struct _RECT_FLOAT RECT_FLOAT;
-struct _RECT_FLOAT{
-
-  float x1,y1,x2,y2;
-
-};
-
-typedef struct _COLOR_COMPONENTS COLOR_COMPONENTS;
-struct _COLOR_COMPONENTS{
-
-  float R,G,B,A;
-
-};
-
-typedef struct _GlDrawing GlDrawing;
-struct _GlDrawing
+typedef struct
 {
+  gfloat X, Y, Z, W;
+}XYZW;
 
-  struct ShaderEnv bar_shader;
-  gint bar_quads_num;
+/* *INDENT-OFF* */
+static const GLfloat positions[] = {
+     -1.0,  1.0,  0.0, 1.0,
+      1.0,  1.0,  0.0, 1.0,
+      1.0, -1.0,  0.0, 1.0,
+     -1.0, -1.0,  0.0, 1.0,
+};
+
+static const GLushort indices_quad[] = { 0, 1, 2, 0, 2, 3 };
+/* *INDENT-ON* */
+
+/*
+typedef struct
+{
+  const gchar *name;
+  int location;
+  unsigned int n_elements;
+  GLenum element_type;
+  unsigned int offset;
+  unsigned int stride;
+}attribute;
+*/
+
+typedef struct{
+  int x1,y1,x2,y2;
+}RECT_INT;
+
+typedef struct{
+  float x1,y1,x2,y2;
+}RECT_FLOAT;
+
+typedef struct{
+  float R,G,B,A;
+}COLOR_COMPONENTS;
+
+typedef struct{
+
+  GstGLShader *shader;
+  unsigned int vao;
+  unsigned int vbo;
+  unsigned int vbo_indices;
+
+  //attribute attribute_vertex;
+
+  GLuint attributes_location;
+
+  char error_message[error_message_size];
+
+  //-------
+
+  int bar_quads_num;
   //На примере вертикального бара, рисуемого снизу вверх
   //При повороте переменные в данном блоке всеравно считаются относительно верха бара
   //Отношение ширины к длине 1 бара
@@ -70,38 +123,44 @@ struct _GlDrawing
   //высота пика в процентах от высоты бара
   float peak_height_percent;
 
-  float bars_begin_pix;
-  float bars_end_pix;
-  float bar_len_pix;
-  float bar_step_pix;
-  float band_len_pix;
-  float band_distanse_pix;
-  float peak_len_pix;
+  float bars_begin;
+  float bars_end;
+  float bar_len;
+  float bar_step;
+  float band_len;
+  float band_distanse;
+  float peak_len;
 
-  gint draw_direction;
+  int draw_direction;
 
-  gint pixel_width;
-  gint pixel_height;
+  int width;
+  int height;
 
   COLOR_COMPONENTS bg_color;
 
   float audio_levels_in_pixels[AUDIO_LEVELS+1];
 
-  gchar error_message[error_message_size];
+  //gchar error_message[error_message_size];
 
-};
+}GlDrawing;
 
 void gldraw_first_init(GlDrawing *src);
-gboolean gldraw_init (GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result,
-                      gint width, gint height,
-                      gint direction,
-                      gfloat bg_color_r,
-                      gfloat bg_color_g,
-                      gfloat bg_color_b,
-                      gfloat bg_color_a);
 
-gboolean gldraw_render(GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result);
-void gldraw_close (GstGLContext * context, GlDrawing *src, ResultData *audio_proceess_result);
+void setBGColor(GlDrawing *src, unsigned int color);
+
+gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result,
+                      int width, int height,
+                      int direction,
+                      float bg_color_r,
+                      float bg_color_g,
+                      float bg_color_b,
+                      float bg_color_a);
+
+gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result);
+void gldraw_close (GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result);
+
+
+
 
 #endif //__GLDRAWING_H__
 
