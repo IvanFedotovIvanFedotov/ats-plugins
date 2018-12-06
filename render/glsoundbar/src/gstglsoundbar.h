@@ -35,15 +35,10 @@
 
 #include <gst/gl/gl.h>
 
-//#include "audiosamplesbuf.h"
 #include "gldrawing.h"
 
 
-
-
-
 G_BEGIN_DECLS
-
 
 
 
@@ -95,8 +90,6 @@ struct _GstGLSoundbar
   GstClockTime running_time;            /* total running time */
   long long n_frames;
 
-  //AudioSamplesBuf audio_samples_buf;
-
   GlDrawing gl_drawing;
   gboolean gl_drawing_created;
 
@@ -104,13 +97,7 @@ struct _GstGLSoundbar
 
   unsigned int bg_color;
 
-  //audio
-
   loudness result;
-
-
-
-
 
 };
 
@@ -118,20 +105,12 @@ struct _GstGLSoundbarClass
 {
   GstElementClass parent_class;
 
-  //public
   GstGLAPI supported_gl_api;
 
 };
 
-
-
-//GST_EXPORT
 GType gst_glsoundbar_get_type (void);
 
 G_END_DECLS
-
-
-
-
 
 #endif /* __GST_GLSOUNDBAR_H__ */

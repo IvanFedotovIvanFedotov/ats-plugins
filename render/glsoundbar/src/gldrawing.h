@@ -25,13 +25,9 @@
 #ifndef __GLDRAWING_H__
 #define __GLDRAWING_H__
 
-//#include "shaderenv.h"
-
 #include <glib.h>
 #include <gst/gl/gl.h>
 #include <gst/gl/gstglfuncs.h>
-
-
 
 //2 переменные должны быть оодинаковыми
 #define MAX_CHANNELS 64
@@ -72,18 +68,6 @@ static const GLfloat positions[] = {
 static const GLushort indices_quad[] = { 0, 1, 2, 0, 2, 3 };
 /* *INDENT-ON* */
 
-/*
-typedef struct
-{
-  const gchar *name;
-  int location;
-  unsigned int n_elements;
-  GLenum element_type;
-  unsigned int offset;
-  unsigned int stride;
-}attribute;
-*/
-
 typedef struct{
   int x1,y1,x2,y2;
 }RECT_INT;
@@ -103,13 +87,9 @@ typedef struct{
   unsigned int vbo;
   unsigned int vbo_indices;
 
-  //attribute attribute_vertex;
-
   GLuint attributes_location;
 
   char error_message[error_message_size];
-
-  //-------
 
   int bar_quads_num;
   //На примере вертикального бара, рисуемого снизу вверх
@@ -140,7 +120,6 @@ typedef struct{
 
   float audio_levels_in_pixels[AUDIO_LEVELS+1];
 
-  //gchar error_message[error_message_size];
 
 }GlDrawing;
 
@@ -158,9 +137,6 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
 
 gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result);
 void gldraw_close (GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result);
-
-
-
 
 #endif //__GLDRAWING_H__
 
