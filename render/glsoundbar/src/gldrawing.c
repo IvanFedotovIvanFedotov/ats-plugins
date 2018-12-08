@@ -65,7 +65,7 @@ static const gchar *bar_vertex_src =
 
 
 
-static const gchar *bar_fragment_vertical_src =
+static const gchar *bar_fragment_src =
     "#version 120\n"
     "#ifdef GL_ES\n"
     "precision mediump float;\n"
@@ -81,6 +81,7 @@ static const gchar *bar_fragment_vertical_src =
     "uniform float bars_end;\n"
     "uniform float bar_len;\n"
     "uniform float bar_step;\n"
+    "uniform int direction;\n"//0-vertical
     BAND_LEN
     BAND_DISTANSE
     PEAK_SIZE
@@ -98,92 +99,89 @@ static const gchar *bar_fragment_vertical_src =
     "   float coord_y;\n"
     "   coord_x=gl_FragCoord.x/width;\n"
     "   coord_y=gl_FragCoord.y/height;\n"
-    "   pos=coord_x-bars_begin;\n"
+    "   if(direction==0){"
+    "     pos=coord_x-bars_begin;\n"
+    "   }"
+    "   else{"
+    "     pos=coord_y-bars_begin;\n"
+    "   }"
+/*
+  //test Eugenii
+    "   float bar_step1=(bars_end-bars_begin)/float(bars_num);"
+    "   float bar_len1= 0.5*bar_step1;"
+    "   bar_pos=mod(pos,bar_step1);\n"
+    "   bar_num=int(pos/bar_step1);\n"
+    "   y=1.0-coord_y;\n"
+    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len1 || pos<0.0){"
+    "       gl_FragColor = bg_color;\n"
+    "       return;\n"
+    "   }\n"
+*/
+
+/*
+  //test rounds
+    "   float bar_step1=round((bars_end-bars_begin)/float(bars_num)*width)/width;"
+    "   float bar_len1=round( 0.5*bar_step1*width)/width;"
+    "   bar_pos=mod(pos,bar_step1);\n"
+    "   bar_num=int(pos/bar_step1);\n"
+    "   y=1.0-coord_y;\n"
+    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len1 || pos<0.0){"
+    "       gl_FragColor = bg_color;\n"
+    "       return;\n"
+    "   }\n"
+*/
+
+  // shader work
     "   bar_pos=mod(pos,bar_step);\n"
     "   bar_num=int(pos/bar_step);\n"
     "   y=1.0-coord_y;\n"
-    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len || pos<0.0){"// || bar_pos+1.0>bar_len || pos<0.0){\n"
+    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len || pos<0.0){"
     "       gl_FragColor = bg_color;\n"
     "       return;\n"
     "   }\n"
-    "   loud_average=(1.0-loud_average_arr[bar_num]);\n"
-    "   loud_peak=(1.0-loud_peak_arr[bar_num]);\n"
-    "   loud_peak=max(loud_peak,peak_size);"
-    "   if(coord_y+peak_size>loud_peak && coord_y<loud_peak){\n"
-    "       gl_FragColor ="COLOR_PEAK";\n"
-    "       return;\n"
-    "   }\n"
-    "   if(coord_y>loud_average){\n"
-    "       int index=0;"
-    "       index=int(floor(-5.556*y+6.222));"
-    "       index=min(index,4);"
-    "       if(mod(y,band_distanse)<band_len){\n"
-    "         gl_FragColor=color_audio_levels[index];\n"
-    "         return;\n"
-    "       }\n"
-    "   }\n"
+  // shader work
+
+    "   if(direction==0){"
+    "      loud_average=(1.0-loud_average_arr[bar_num]);\n"
+    "      loud_peak=(1.0-loud_peak_arr[bar_num]);\n"
+    "      loud_peak=max(loud_peak,peak_size);"
+    "      if(coord_y+peak_size>loud_peak && coord_y<loud_peak){\n"
+    "          gl_FragColor ="COLOR_PEAK";\n"
+    "          return;\n"
+    "      }\n"
+    "      if(coord_y>loud_average){\n"
+    "          int index=0;"
+    "          index=int(floor(-5.556*y+6.222));"
+    "          index=min(index,4);"
+    "          if(mod(y,band_distanse)<band_len){\n"
+    "            gl_FragColor=color_audio_levels[index];\n"
+    "            return;\n"
+    "          }\n"
+    "      }\n"
+    "   }"
+    "   else{"
+    "      loud_average=loud_average_arr[bar_num];\n"
+    "      loud_peak=loud_peak_arr[bar_num];\n"
+    "      loud_peak=max(loud_peak,peak_size);"
+    "      if(coord_x<loud_peak && coord_x>loud_peak-peak_size){\n"
+    "          gl_FragColor ="COLOR_PEAK";\n"
+    "          return;\n"
+    "      }\n"
+    "      if(coord_x<loud_average){\n"
+    "          int index=0;"
+    "          index=int(floor(-5.556*coord_x+6.222));"
+    "          index=min(index,4);"
+    "          if(mod(coord_x,band_distanse)<band_len){\n"
+    "            gl_FragColor=color_audio_levels[index];\n"
+    "            return;\n"
+    "          }\n"
+    "      }\n"
+    "   }"
     "   gl_FragColor = bg_color;\n"
     "}";
 
 
 
-static const gchar *bar_fragment_horizontal_src =
-    "#version 120\n"
-    "#ifdef GL_ES\n"
-    "precision mediump float;\n"
-    "#endif\n"
-    "int shaderright;"
-    "uniform int  bars_num;\n"
-    "uniform vec4 bg_color;\n"
-    "uniform float width;\n"
-    "uniform float height;\n"
-    "uniform float loud_average_arr["MAX_CHANNELS_AS_STR"];"
-    "uniform float loud_peak_arr["MAX_CHANNELS_AS_STR"];"
-    "uniform float bars_begin;\n"
-    "uniform float bars_end;\n"
-    "uniform float bar_len;\n"
-    "uniform float bar_step;\n"
-    BAND_LEN
-    BAND_DISTANSE
-    PEAK_SIZE
-    AUDIO_LEVELS
-    COLOR_AUDIO_LEVELS
-    "int bar_num;\n"
-    "float bar_pos;\n"
-    "float pos;\n"
-    "float loud_average;\n"
-    "float loud_peak;\n"
-    "void main()\n"
-    "{\n"
-    "   float coord_x;\n"
-    "   float coord_y;\n"
-    "   coord_x=gl_FragCoord.x/width;\n"
-    "   coord_y=gl_FragCoord.y/height;\n"
-    "   pos=coord_y-bars_begin;\n"
-    "   bar_pos=mod(pos,bar_step);\n"
-    "   bar_num=int(pos/bar_step);\n"
-    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len || pos<0.0){\n"
-    "       gl_FragColor = bg_color;\n"
-    "       return;\n"
-    "   }\n"
-    "   loud_average=loud_average_arr[bar_num];\n"
-    "   loud_peak=loud_peak_arr[bar_num];\n"
-    "   loud_peak=max(loud_peak,peak_size);"
-    "   if(coord_x<loud_peak && coord_x>loud_peak-peak_size){\n"
-    "       gl_FragColor ="COLOR_PEAK";\n"
-    "       return;\n"
-    "   }\n"
-    "   if(coord_x<loud_average){\n"
-    "       int index=0;"
-    "       index=int(floor(-5.556*coord_x+6.222));"
-    "       index=min(index,4);"
-    "       if(mod(coord_x,band_distanse)<band_len){\n"
-    "         gl_FragColor=color_audio_levels[index];\n"
-    "         return;\n"
-    "       }\n"
-    "   }\n"
-    "   gl_FragColor = bg_color;\n"
-    "}";
 
 
 void gldraw_first_init(GlDrawing *src){
@@ -269,32 +267,15 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
   gl->BindBuffer (GL_ARRAY_BUFFER, src->vbo);
   gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, src->vbo_indices);
 
-  switch(src->draw_direction){
-    case GLSOUND_BAR_DRAW_DIRECTION_TO_UP:
-      src->shader = gst_gl_shader_new_link_with_stages (context, &error,
-        gst_glsl_stage_new_with_string (context, GL_VERTEX_SHADER,
-          GST_GLSL_VERSION_NONE,
-          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
-          bar_vertex_src),
-        gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
-          GST_GLSL_VERSION_NONE,
-          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
-          bar_fragment_vertical_src), NULL);
-       break;
-    case GLSOUND_BAR_DRAW_DIRECTION_TO_RIGHT:
-      src->shader = gst_gl_shader_new_link_with_stages (context, &error,
-        gst_glsl_stage_new_with_string (context, GL_VERTEX_SHADER,
-          GST_GLSL_VERSION_NONE,
-          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
-          bar_vertex_src),
-        gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
-          GST_GLSL_VERSION_NONE,
-          GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
-          bar_fragment_horizontal_src), NULL);
-      break;
-    default:
-    break;
-  }
+  src->shader = gst_gl_shader_new_link_with_stages (context, &error,
+    gst_glsl_stage_new_with_string (context, GL_VERTEX_SHADER,
+      GST_GLSL_VERSION_NONE,
+      GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
+      bar_vertex_src),
+    gst_glsl_stage_new_with_string (context, GL_FRAGMENT_SHADER,
+      GST_GLSL_VERSION_NONE,
+      GST_GLSL_PROFILE_ES | GST_GLSL_PROFILE_COMPATIBILITY,
+      bar_fragment_src), NULL);
 
   if(!src->shader){
     int len;
@@ -341,9 +322,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_p
   gst_gl_shader_set_uniform_1f(src->shader, "bars_end",src->bars_end);
   gst_gl_shader_set_uniform_1f(src->shader, "bar_len",src->bar_len);
   gst_gl_shader_set_uniform_1f(src->shader, "bar_step",src->bar_step);
+  gst_gl_shader_set_uniform_1i(src->shader, "direction", src->draw_direction);
 
   gl->DrawElements (GL_TRIANGLES, 6 , GL_UNSIGNED_SHORT,(gpointer) (gintptr) 0);
-
 
   gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
   gl->BindBuffer (GL_ARRAY_BUFFER, 0);
