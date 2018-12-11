@@ -109,7 +109,7 @@ typedef struct{
   float bar_step;
   float band_len;
   float band_distanse;
-  float peak_len;
+  float peak_size;
 
   int draw_direction;
 

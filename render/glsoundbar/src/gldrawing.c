@@ -49,10 +49,10 @@
 #define COLOR_PEAK "vec4(1.0,1.0,1.0,1.0)"
 
 
-#define BAND_LEN "float band_len=0.032;"
-#define BAND_DISTANSE "float band_distanse=0.040;"
-#define PEAK_SIZE "float peak_size=0.008;"
-#define BAR_ASPECT 0.7
+#define BAND_LEN (3.0/4.0)
+#define BAND_DISTANSE 8.0
+#define PEAK_SIZE 3.0
+#define BAR_ASPECT 0.5
 
 
 static const gchar *bar_vertex_src =
@@ -64,27 +64,24 @@ static const gchar *bar_vertex_src =
     "}";
 
 
-
 static const gchar *bar_fragment_src =
     "#version 120\n"
     "#ifdef GL_ES\n"
     "precision mediump float;\n"
     "#endif\n"
-    "int shaderup;"
     "uniform int  bars_num;\n"
     "uniform vec4 bg_color;\n"
-    "uniform float width;\n"
-    "uniform float height;\n"
+    "uniform vec2 width_height; "
     "uniform float loud_average_arr["MAX_CHANNELS_AS_STR"];"
     "uniform float loud_peak_arr["MAX_CHANNELS_AS_STR"];"
     "uniform float bars_begin;\n"
     "uniform float bars_end;\n"
     "uniform float bar_len;\n"
     "uniform float bar_step;\n"
-    "uniform int direction;\n"//0-vertical
-    BAND_LEN
-    BAND_DISTANSE
-    PEAK_SIZE
+    "uniform bool direction;\n"
+    "uniform float band_len;"
+    "uniform float band_distanse;"
+    "uniform float peak_size;"
     AUDIO_LEVELS
     COLOR_AUDIO_LEVELS
     "int bar_num;\n"
@@ -92,68 +89,35 @@ static const gchar *bar_fragment_src =
     "float pos;\n"
     "float loud_average;"
     "float loud_peak;"
-    "float y;"
     "void main()\n"
     "{\n"
-    "   float coord_x;\n"
-    "   float coord_y;\n"
-    "   coord_x=gl_FragCoord.x/width;\n"
-    "   coord_y=gl_FragCoord.y/height;\n"
-    "   if(direction==0){"
-    "     pos=coord_x-bars_begin;\n"
+    "   vec2 coord_xy;\n"
+    "   coord_xy=gl_FragCoord.xy/width_height;\n"
+    "   if(!direction){"
+    "     pos=coord_xy.x-bars_begin;\n"
     "   }"
     "   else{"
-    "     pos=coord_y-bars_begin;\n"
+    "     pos=coord_xy.y-bars_begin;\n"
     "   }"
-/*
-  //test Eugenii
-    "   float bar_step1=(bars_end-bars_begin)/float(bars_num);"
-    "   float bar_len1= 0.5*bar_step1;"
-    "   bar_pos=mod(pos,bar_step1);\n"
-    "   bar_num=int(pos/bar_step1);\n"
-    "   y=1.0-coord_y;\n"
-    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len1 || pos<0.0){"
-    "       gl_FragColor = bg_color;\n"
-    "       return;\n"
-    "   }\n"
-*/
-
-/*
-  //test rounds
-    "   float bar_step1=round((bars_end-bars_begin)/float(bars_num)*width)/width;"
-    "   float bar_len1=round( 0.5*bar_step1*width)/width;"
-    "   bar_pos=mod(pos,bar_step1);\n"
-    "   bar_num=int(pos/bar_step1);\n"
-    "   y=1.0-coord_y;\n"
-    "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len1 || pos<0.0){"
-    "       gl_FragColor = bg_color;\n"
-    "       return;\n"
-    "   }\n"
-*/
-
-  // shader work
     "   bar_pos=mod(pos,bar_step);\n"
     "   bar_num=int(pos/bar_step);\n"
-    "   y=1.0-coord_y;\n"
     "   if(bar_num<0 || bar_num>=bars_num || bar_pos>bar_len || pos<0.0){"
     "       gl_FragColor = bg_color;\n"
     "       return;\n"
     "   }\n"
-  // shader work
-
-    "   if(direction==0){"
+    "   if(!direction){"
     "      loud_average=(1.0-loud_average_arr[bar_num]);\n"
     "      loud_peak=(1.0-loud_peak_arr[bar_num]);\n"
     "      loud_peak=max(loud_peak,peak_size);"
-    "      if(coord_y+peak_size>loud_peak && coord_y<loud_peak){\n"
+    "      if(coord_xy.y+peak_size>loud_peak && coord_xy.y<loud_peak){\n"
     "          gl_FragColor ="COLOR_PEAK";\n"
     "          return;\n"
     "      }\n"
-    "      if(coord_y>loud_average){\n"
+    "      if(coord_xy.y>loud_average){\n"
     "          int index=0;"
-    "          index=int(floor(-5.556*y+6.222));"
+    "          index=int(floor(-5.556*(1.0-coord_xy.y)+6.222));"
     "          index=min(index,4);"
-    "          if(mod(y,band_distanse)<band_len){\n"
+    "          if(mod(1.0-coord_xy.y,band_distanse)<band_len){\n"
     "            gl_FragColor=color_audio_levels[index];\n"
     "            return;\n"
     "          }\n"
@@ -163,15 +127,15 @@ static const gchar *bar_fragment_src =
     "      loud_average=loud_average_arr[bar_num];\n"
     "      loud_peak=loud_peak_arr[bar_num];\n"
     "      loud_peak=max(loud_peak,peak_size);"
-    "      if(coord_x<loud_peak && coord_x>loud_peak-peak_size){\n"
+    "      if(coord_xy.x<loud_peak && coord_xy.x>loud_peak-peak_size){\n"
     "          gl_FragColor ="COLOR_PEAK";\n"
     "          return;\n"
     "      }\n"
-    "      if(coord_x<loud_average){\n"
+    "      if(coord_xy.x<loud_average){\n"
     "          int index=0;"
-    "          index=int(floor(-5.556*coord_x+6.222));"
+    "          index=int(floor(-5.556*coord_xy.x+6.222));"
     "          index=min(index,4);"
-    "          if(mod(coord_x,band_distanse)<band_len){\n"
+    "          if(mod(coord_xy.x,band_distanse)<band_len){\n"
     "            gl_FragColor=color_audio_levels[index];\n"
     "            return;\n"
     "          }\n"
@@ -251,10 +215,34 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
 
   channels=(float)audio_proceess_result->channels;
 
-  src->bar_len=src->bar_aspect;
-  src->bar_step=src->bar_len+(1.0-src->bar_len*(channels))/(channels+2.0);
-  src->bars_begin=(1.0-src->bar_step*channels)/2.0+(src->bar_step-src->bar_len)/2.0;
-  src->bars_end=src->bars_begin+src->bar_step*channels+(src->bar_step-src->bar_len)/2.0;
+  src->bar_len=0.0;
+  src->bar_step=0.0;
+  src->bars_begin=0.0;
+  src->bars_end=0.0;
+  src->band_len=0.0;
+  src->band_distanse=0.0;
+  src->peak_size=0.0;
+
+  if(height>0 && width>0){
+    if(src->draw_direction==0){
+      src->band_distanse=BAND_DISTANSE/height;
+      src->band_len=BAND_LEN*src->band_distanse;
+      src->peak_size=PEAK_SIZE/height;
+      src->bar_len=round(src->bar_aspect*width)/width;
+      src->bar_step=round((src->bar_len+(1.0-src->bar_len*(channels))/(channels+2.0))*width)/width;
+      src->bars_begin=round(((1.0-src->bar_step*channels)/2.0+(src->bar_step-src->bar_len)/2.0)*width)/width;
+      src->bars_end=round((src->bars_begin+src->bar_step*channels+(src->bar_step-src->bar_len)/2.0)*width)/width;
+    }else{
+      src->band_distanse=BAND_DISTANSE/width;
+      src->band_len=BAND_LEN*src->band_distanse;
+      src->peak_size=PEAK_SIZE/width;
+      src->bar_len=round(src->bar_aspect*height)/height;
+      src->bar_step=round((src->bar_len+(1.0-src->bar_len*(channels))/(channels+2.0))*height)/height;
+      src->bars_begin=round(((1.0-src->bar_step*channels)/2.0+(src->bar_step-src->bar_len)/2.0)*height)/height;
+      src->bars_end=round((src->bars_begin+src->bar_step*channels+(src->bar_step-src->bar_len)/2.0)*height)/height;
+    }
+  }
+
 
   if(gl->GenVertexArrays){
     gl->GenVertexArrays (1, &src->vao);
@@ -314,8 +302,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_p
 
   gst_gl_shader_set_uniform_1i(src->shader, "bars_num", src->bar_quads_num);
   gst_gl_shader_set_uniform_4f(src->shader, "bg_color", src->bg_color.R, src->bg_color.G, src->bg_color.B, src->bg_color.A);
-  gst_gl_shader_set_uniform_1f(src->shader, "width", src->width);
-  gst_gl_shader_set_uniform_1f(src->shader, "height", src->height);
+  gst_gl_shader_set_uniform_2f(src->shader, "width_height", src->width, src->height);
   gst_gl_shader_set_uniform_1fv(src->shader, "loud_average_arr", src->bar_quads_num, (float *)audio_proceess_result->loud_average_db);
   gst_gl_shader_set_uniform_1fv(src->shader, "loud_peak_arr", src->bar_quads_num, (float *)audio_proceess_result->loud_peak_db);
   gst_gl_shader_set_uniform_1f(src->shader, "bars_begin",src->bars_begin);
@@ -323,6 +310,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_p
   gst_gl_shader_set_uniform_1f(src->shader, "bar_len",src->bar_len);
   gst_gl_shader_set_uniform_1f(src->shader, "bar_step",src->bar_step);
   gst_gl_shader_set_uniform_1i(src->shader, "direction", src->draw_direction);
+  gst_gl_shader_set_uniform_1f(src->shader, "band_len",src->band_len);
+  gst_gl_shader_set_uniform_1f(src->shader, "band_distanse",src->band_distanse);
+  gst_gl_shader_set_uniform_1f(src->shader, "peak_size",src->peak_size);
 
   gl->DrawElements (GL_TRIANGLES, 6 , GL_UNSIGNED_SHORT,(gpointer) (gintptr) 0);
 

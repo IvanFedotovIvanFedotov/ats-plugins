@@ -354,6 +354,7 @@ default_decide_allocation (GstGLSoundbar * scope, GstQuery * query)
 
   _find_local_gl_context (src);
 
+  /* TODO fix context creation
   if (!scope->context) {
     GST_OBJECT_LOCK (scope->display);
     do {
@@ -372,6 +373,7 @@ default_decide_allocation (GstGLSoundbar * scope, GstQuery * query)
     } while (!gst_gl_display_add_context (scope->display, scope->context));
     GST_OBJECT_UNLOCK (scope->display);
   }
+  */
 
   if ((gst_gl_context_get_gl_api (src->context) & SUPPORTED_GL_APIS) == 0){
     goto unsupported_gl_api;
