@@ -275,7 +275,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
 
   src->attributes_location = gst_gl_shader_get_attribute_location (src->shader, "position");
   gl->BufferData (GL_ARRAY_BUFFER, 4 * sizeof(XYZW), positions, GL_STATIC_DRAW);
-  gl->BufferData (GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_DYNAMIC_DRAW);
+  gl->BufferData (GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_STATIC_DRAW);
   gl->VertexAttribPointer (src->attributes_location, 4, GL_FLOAT, GL_FALSE, sizeof (GLfloat) * 4, (gpointer) (gintptr) 0);
 
   gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
