@@ -85,6 +85,8 @@ struct _GstGLSoundbar
   GstGLDisplay *display;
   GstGLContext *context, *other_context;
   gboolean gl_result;
+  int context_refs;
+  int display_refs;
 
   /* base offset */
   GstClockTime running_time;            /* total running time */
@@ -98,6 +100,9 @@ struct _GstGLSoundbar
   unsigned int bg_color;
 
   loudness result;
+
+
+  GstBuffer *prev_push_outbuf;
 
 };
 
