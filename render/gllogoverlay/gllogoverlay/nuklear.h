@@ -4664,7 +4664,8 @@ struct nk_draw_command {
 
 struct nk_draw_list {
     struct nk_rect clip_rect;
-    struct nk_vec2 circle_vtx[12];
+    //struct nk_vec2 circle_vtx[12];//<<< orig
+    struct nk_vec2 circle_vtx[36];
     struct nk_convert_config config;
 
     struct nk_buffer *buffer;
@@ -9777,13 +9778,25 @@ nk_draw_list_stroke_poly_line(struct nk_draw_list *list, const struct nk_vec2 *p
             diff = nk_vec2_muls(diff, len);
 
             /* add vertices */
+            dx = diff.x * (thickness);
+            dy = diff.y * (thickness);
+            
+/* //<<< orig
+ 
             dx = diff.x * (thickness * 0.5f);
             dy = diff.y * (thickness * 0.5f);
-
+ 
             vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p1.x + dy, p1.y - dx), uv, col);
             vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p2.x + dy, p2.y - dx), uv, col);
             vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p2.x - dy, p2.y + dx), uv, col);
             vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p1.x - dy, p1.y + dx), uv, col);
+*/
+
+            vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p1.x , p1.y), uv, col);
+            vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p2.x , p2.y), uv, col);
+            vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p2.x - dy*1.0, p2.y + dx*1.0), uv, col);
+            vtx = nk_draw_vertex(vtx, &list->config, nk_vec2(p1.x - dy*1.0, p1.y + dx*1.0), uv, col);
+
 
             ids[0] = (nk_draw_index)(idx+0); ids[1] = (nk_draw_index)(idx+1);
             ids[2] = (nk_draw_index)(idx+2); ids[3] = (nk_draw_index)(idx+0);
@@ -10023,10 +10036,23 @@ nk_draw_list_path_rect_to(struct nk_draw_list *list, struct nk_vec2 a,
         nk_draw_list_path_line_to(list, b);
         nk_draw_list_path_line_to(list, nk_vec2(a.x,b.y));
     } else {
+/*
+        nk_draw_list_path_arc_to(list, nk_vec2(a.x + r, a.y + r), r, 6*3, 9*3, 36);
+        nk_draw_list_path_arc_to(list, nk_vec2(b.x - r, a.y + r), r, 9*3, 12*3, 36);
+        nk_draw_list_path_arc_to(list, nk_vec2(b.x - r, b.y - r), r, 0, 3*3, 36);
+        nk_draw_list_path_arc_to(list, nk_vec2(a.x + r, b.y - r), r, 3*3, 6*3, 36);
+*/
+        nk_draw_list_path_arc_to_fast(list, nk_vec2(a.x + r, a.y + r), r, 6*3, 9*3);
+        nk_draw_list_path_arc_to_fast(list, nk_vec2(b.x - r, a.y + r), r, 9*3, 12*3);
+        nk_draw_list_path_arc_to_fast(list, nk_vec2(b.x - r, b.y - r), r, 0, 3*3);
+        nk_draw_list_path_arc_to_fast(list, nk_vec2(a.x + r, b.y - r), r, 3*3, 6*3);
+
+    /* //<<< orig
         nk_draw_list_path_arc_to_fast(list, nk_vec2(a.x + r, a.y + r), r, 6, 9);
         nk_draw_list_path_arc_to_fast(list, nk_vec2(b.x - r, a.y + r), r, 9, 12);
         nk_draw_list_path_arc_to_fast(list, nk_vec2(b.x - r, b.y - r), r, 0, 3);
         nk_draw_list_path_arc_to_fast(list, nk_vec2(a.x + r, b.y - r), r, 3, 6);
+*/
     }
 }
 NK_API void
@@ -12693,7 +12719,8 @@ nk_font_bake_pack(struct nk_font_baker *baker,
         } while ((it = it->n) != config_iter);
     }
     *height = 0;
-    *width = (total_glyph_count > 1000) ? 1024 : 512;
+    //*width = (total_glyph_count > 1000) ? 1024 : 512; //<<< orig
+    *width = 4096;
     nk_tt_PackBegin(&baker->spc, 0, (int)*width, (int)max_height, 0, 1, alloc);
     {
         int input_i = 0;
