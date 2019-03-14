@@ -20,8 +20,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_GL_DISPLAY_ERRORS_H__
-#define __GST_GL_DISPLAY_ERRORS_H__
+#ifndef __GST_GL_TEXT_OVERLAY_H__
+#define __GST_GL_TEXT_OVERLAY_H__
 
 #include <gst/gst.h>
 #include <gst/base/gstpushsrc.h>
@@ -30,38 +30,38 @@
 
 
 #include "gldrawing.h"
-#include "errorshandler.h"
+
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_GL_DISPLAY_ERRORS \
-    (gst_gl_dispaly_errors_get_type())
-#define GST_GL_DISPLAY_ERRORS(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_GL_DISPLAY_ERRORS,GstGLDisplayErrors))
-#define GST_GL_DISPLAY_ERRORS_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_GL_DISPLAY_ERRORS,GstGLDisplayErrorsClass))
-#define GST_IS_GL_DISPLAY_ERRORS(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_GL_DISPLAY_ERRORS))
-#define GST_IS_GL_DISPLAY_ERRORS_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_GL_DISPLAY_ERRORS))
+#define GST_TYPE_GL_TEXT_OVERLAY \
+    (gst_gl_text_overlay_get_type())
+#define GST_GL_TEXT_OVERLAY(obj) \
+    (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_GL_TEXT_OVERLAY,GstGLTextOverlay))
+#define GST_GL_TEXT_OVERLAY_CLASS(klass) \
+    (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_GL_TEXT_OVERLAY,GstGLTextOverlayClass))
+#define GST_IS_GL_TEXT_OVERLAY(obj) \
+    (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_GL_TEXT_OVERLAY))
+#define GST_IS_GL_TEXT_OVERLAY_CLASS(klass) \
+    (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_GL_TEXT_OVERLAY))
 
-//typedef struct _GstGLDisplayErrorsPrivate GstGLDisplayErrorsPrivate;
-typedef struct _GstGLDisplayErrors GstGLDisplayErrors;
-typedef struct _GstGLDisplayErrorsClass GstGLDisplayErrorsClass;
+//typedef struct _GstGLTextOverlayPrivate GstGLTextOverlayPrivate;
+typedef struct _GstGLTextOverlay GstGLTextOverlay;
+typedef struct _GstGLTextOverlayClass GstGLTextOverlayClass;
 
 /**
- * GstGLDisplayErrors:
+ * GstGLTextOverlay:
  *
  * Opaque data structure.
  */
-struct _GstGLDisplayErrors {
+struct _GstGLTextOverlay {
     GstPushSrc element;
 
     /*< private >*/
 
     /* type of output */
-    //GstGLDisplayErrorsPattern set_pattern;
-    //GstGLDisplayErrorsPattern active_pattern;
+    //GstGLTextOverlayPattern set_pattern;
+    //GstGLTextOverlayPattern active_pattern;
 
     /* video state */
     GstVideoInfo vinfo;
@@ -89,21 +89,21 @@ struct _GstGLDisplayErrors {
 
 
     GstPad *sinkpad;
-    GstClock *pipeline_clock;
+    GstPad *srcpad;
 
     GlDrawing gl_drawing;
-    ErrorsHandler *errors_handler;
+
 
 
 
 };
 
-struct _GstGLDisplayErrorsClass {
+struct _GstGLTextOverlayClass {
     GstPushSrcClass parent_class;
 };
 
-GType gst_gl_dispaly_errors_get_type (void);
+GType gst_gl_text_overlay_get_type (void);
 
 G_END_DECLS
 
-#endif /* __GST_GL_DISPLAY_ERRORS_H__ */
+#endif /* __GST_GL_TEXT_OVERLAY_H__ */

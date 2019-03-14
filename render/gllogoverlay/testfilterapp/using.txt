@@ -1,1 +1,6 @@
 ./testfilterapp test1
+./testfilterapp test2
+./testfilterapp test3
+
+print font list:
+./testfilterapp fonts

@@ -31,6 +31,10 @@ gst-launch-1.0 gldisplayerrors set-errors=0x07 ! glimagesink
 #include <stdlib.h>
 #include <math.h>
 
+#include <fontconfig/fontconfig.h>
+
+#include <stdio.h>
+
 
 
 //gst-launch-1.0 gldisplayerrors set_errors=0x05 ! glimagesink
@@ -129,15 +133,70 @@ static const GLfloat positions2[] = {
 
 //----------------
 
+void gldraw_clear_set_pipeline_clock(GlDrawing *src, GstClock *_pipeline_clock){
+  src->pipeline_clock=_pipeline_clock;
+}
+
+int gldraw_get_history_errors_window_size(GlDrawing *src){
+
+  return src->history_errors_window_size;
+
+}
+
+int gldraw_get_history_errors_full_size(GlDrawing *src){
+
+  return src->history_errors_window_size+1;
+
+}
 
 
 
+void gldraw_set_history_errors_window_size(GlDrawing *src, int value){
+  if(value<1)value=1;
+  if(value>history_errors_full_max_size-1)value=history_errors_full_max_size-1;
+  src->history_errors_window_size=value;
 
-void setBGColor(GlDrawing *src, unsigned int color){
+}
+
+
+
+void gldraw_set_bg_color(GlDrawing *src, unsigned int color){
+
+  src->color_background[0]=(float)((color & 0xff000000)>>24);
+  src->color_background[1]=(float)((color & 0x00ff0000)>>16);
+  src->color_background[2]=(float)((color & 0x0000ff00)>>8);
+  src->color_background[3]=(float)((color & 0x000000ff));
 
 
 }
 
+unsigned int gldraw_get_bg_color(GlDrawing *src){
+
+  return (((unsigned int)src->color_background[0]))<<24 |
+         (((unsigned int)src->color_background[1]))<<16 |
+         (((unsigned int)src->color_background[2]))<<8  |
+         (((unsigned int)src->color_background[3]));
+
+}
+
+
+void gldraw_set_text_color(GlDrawing *src, unsigned int color){
+
+  src->color_text[0]=(float)((color & 0xff000000)>>24);
+  src->color_text[1]=(float)((color & 0x00ff0000)>>16);
+  src->color_text[2]=(float)((color & 0x0000ff00)>>8);
+  src->color_text[3]=(float)((color & 0x000000ff));
+
+}
+
+unsigned int gldraw_get_text_color(GlDrawing *src){
+
+  return (((unsigned int)src->color_text[0]))<<24 |
+         (((unsigned int)src->color_text[1]))<<16 |
+         (((unsigned int)src->color_text[2]))<<8  |
+         (((unsigned int)src->color_text[3]));
+
+}
 
 
 const nk_rune nk_font_russian_glyph_ranges[] = {
@@ -191,20 +250,21 @@ static const GLchar *fragment_shader =
 
 
 
-ErrorProperties errors_properties[all_errors_count]=
+ErrorProperties errors_properties[SEVERITY_COUNT]=
 {
-    0.0,0.0,0.0,255,  0.0,255,0.0,255,  255,255,255,160,  0,  ERROR_CODE_ERROR_NONE,           "0 Dummy Error",  //Dummy
-    0.0,0.0,0.0,255,  255,0.0,0.0,255,  255,255,255,160,  3,  ERROR_CODE_ERROR_CAPTION1,       "1 Error русский текст full text caption 1",
-    0.0,0.0,0.0,255,  255,100,0.0,255,  255,255,255,160,  3,  ERROR_CODE_ERROR_CAPTION2,       "2 Error русский текст full text caption 2",
-    0.0,0.0,0.0,255,  255,160,0.0,255,  255,255,255,160,  2,  ERROR_CODE_WARNING_CAPTION1,     "3 Warning русский текст full text caption 1",
-    0.0,0.0,0.0,255,  255,200,0.0,255,  255,255,255,160,  2,  ERROR_CODE_WARNING_CAPTION2,     "4 Warning русский текст full text caption 2",
-    0.0,0.0,0.0,255,  255,255,0.0,255,  255,255,255,160,  1,  ERROR_CODE_MESSAGE_CAPTION1,     "5 Message русский текст full text caption 1",
+
+    0.0,0.0,0.0,255,  0.0,255,0.0,255,  255,255,0,160,
+    0.0,0.0,0.0,255,  255,255,0.0,255,  255,255,100,160,
+    0.0,0.0,0.0,255,  255,200,0.0,255,  255,255,100,160,
+    0.0,0.0,0.0,255,  255,160,0.0,255,  255,200,100,160,
+    0.0,0.0,0.0,255,  255,100,0.0,255,  255,150,100,160,
+    0.0,0.0,0.0,255,  255,0.0,0.0,255,  255,100,100,160
 
 };
 
 
 
-
+gboolean gldraw_add_error_code(GlDrawing *src, int code,int show_time_flag_override, double error_create_time_override, double error_last_time_override);
 
 
 double getCurrentTime(){
@@ -217,110 +277,38 @@ double getCurrentTime(){
 
 
 
-//this_enabled=1 = create line,set flags
-//this_enabled=0 = remove line
-//this_enabled=-1 = non change, auto set show time, no set flags
-void set_text_line_flags(GlDrawing *src, TextRect *text_line,int error_code,int this_enabled,int show_time,double time_val){
-
-      if(this_enabled==-1){
-        if(time_val-text_line->error_last_time>src->time_delta_continous_error_min){
-          text_line->show_time=0;
-        }
-        text_line->error_last_time=time_val;
-      }
-      if(this_enabled==0){
-        text_line->this_enabled=0;
-      }
-      if(this_enabled==1){
-        text_line->this_enabled=1;
-        text_line->error_last_time=time_val;
-        text_line->error_create_time=time_val;
-        text_line->error_selected=error_code;
-        text_line->show_time=show_time;
-      }
 
 
+void fire_error_draw_callback(GlDrawing *src, int draw_callback_event_type){
+
+   DisplayedErrorData *history_ptrs[history_errors_full_max_size];
+   int i;
+
+   for(i=0;i<gldraw_get_history_errors_full_size(src);i++){
+     history_ptrs[i]=&src->history_textlines[i].displayedErrorData;
+   }
+
+   if(src->error_draw_callback!=NULL){
+     (*src->error_draw_callback)(src->error_draw_callback_receiver, src,
+                                 draw_callback_event_type,
+                                 history_ptrs,gldraw_get_history_errors_full_size(src),
+                                 &src->big_textline.displayedErrorData,
+                                 &src->big_flash_rect.displayedErrorData);
+   }
 
 }
 
 
+void gldraw_set_error_draw_callback(GlDrawing *src,
+                                    void *error_draw_callback_receiver,
+                                    void (*_error_draw_callback)(void *, void *,
+                                                                 int, DisplayedErrorData **, int,
+                                                                 DisplayedErrorData *,
+                                                                 DisplayedErrorData *)
+                                    ){
 
-
-
-gboolean gldraw_set_error_codes(GlDrawing *src, int codes){
-
-  int i;
-  double tmp1;
-
-  int priority_error=0;
-
-  for(i=1;i<all_errors_count;i++){
-    if((codes & (0x01<<(i-1)))){
-       priority_error=i;
-       codes = codes ^ (0x01<<(i-1));
-       break;
-    }
-  }
-
-  if((codes & 0x10) == 0x10)gldraw_add_error_code(src, ERROR_CODE_MESSAGE_CAPTION1,-1,-1.0,-1.0);
-  if((codes & 0x08) == 0x08)gldraw_add_error_code(src, ERROR_CODE_WARNING_CAPTION2,-1,-1.0,-1.0);
-  if((codes & 0x04) == 0x04)gldraw_add_error_code(src, ERROR_CODE_WARNING_CAPTION1,-1,-1.0,-1.0);
-  if((codes & 0x02) == 0x02)gldraw_add_error_code(src, ERROR_CODE_ERROR_CAPTION2,-1,-1.0,-1.0);
-  if((codes & 0x01) == 0x01)gldraw_add_error_code(src, ERROR_CODE_ERROR_CAPTION1,-1,-1.0,-1.0);
-
-  if(src->big_textline.this_enabled==0){
-    set_text_line_flags(src,&src->big_textline,priority_error,1,1,getCurrentTime());
-    src->big_textline.error_capture_begin_time=getCurrentTime();
-  }
-  else{
-
-   if(src->big_textline.error_selected==priority_error){
-     set_text_line_flags(src,&src->big_textline,-1,-1,-1,getCurrentTime());
-     gldraw_add_error_code(src, src->big_textline.error_selected,1,-1.0,getCurrentTime());
-/*
-     for(i=0;i<history_errors_full_size;i++){
-      if(src->history_textlines[i].error_selected==priority_error &&
-         src->history_textlines[i].show_time==1){
-        src->history_textlines[i].error_last_time=getCurrentTime();
-        break;
-      }
-     }
-*/
-
-     //set_text_line_flags(src,&src->big_textline,priority_error,-1,1,getCurrentTime());
-   }
-   else {
-
-     tmp1=getCurrentTime();
-
-     if(getCurrentTime()-src->big_textline.error_capture_begin_time > src->time_big_text_capture_time){
-       gldraw_add_error_code(src, src->big_textline.error_selected,src->big_textline.show_time,-1.0,getCurrentTime());
-
-       int find=-1;
-       for(i=0;i<history_errors_full_size;i++){
-         if(src->history_textlines[i].this_enabled==1 &&
-            src->history_textlines[i].show_time==1 &&
-            src->history_textlines[i].error_selected==priority_error){
-              find=i;
-              break;
-            }
-       }
-
-       set_text_line_flags(src,&src->big_textline,priority_error,1,1,getCurrentTime());
-       if(find!=-1)src->big_textline.error_create_time=src->history_textlines[find].error_create_time;
-       src->big_textline.error_capture_begin_time=getCurrentTime();
-
-     }
-     else {
-       gldraw_add_error_code(src, priority_error, -1,-1.0,getCurrentTime());
-     }
-
-
-   }
-
-  }
-
-  return 1;
+  src->error_draw_callback=_error_draw_callback;
+  src->error_draw_callback_receiver=error_draw_callback_receiver;
 
 }
 
@@ -343,22 +331,19 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
     if(len_pix<=max_pixels_str_len)break;
     str_len--;
     if(str_len<=0)return 0;
-    if(str[str_len-1]&0xC0){
+  }
+
+  if(str_len>0){
+    if( (str[str_len-1]&(0x1<<7))|(str[str_len-1]&(0x1<<6))|(!(str[str_len-1]&(0x1<<5)))>0 ){
       str_len--;
     }
-
   }
+
+
 
   if(str_len<=0)return 0;
 
-/*
-  //0x0020, 0x00FF,
-  if(str_len<=0)return 0;
 
-  if(str[str_len-1]&0xC0){
-        str_len--;
-  }
-*/
   return str_len;
 
 }
@@ -366,7 +351,7 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
 
 
 float calc_history_one_line_ly(GlDrawing *src){
-  return ((float)src->history_textlines_ly)/((float)history_errors_window_size);
+  return ((float)src->history_textlines_ly)/((float)src->history_errors_window_size);
 }
 
 float calc_bigtextline_ly(GlDrawing *src){
@@ -380,151 +365,9 @@ float move_history_textlines_shift_y_one_frame(GlDrawing *src){
 
 }
 
-void update_errors_time(GlDrawing *src){
+float gldraw_move_history_textlines_shift_y_only_one_frame(GlDrawing *src){
 
-  int i;
-  double time_val;
-
-  time_val=getCurrentTime();
-
-  if(time_val-src->big_textline.error_last_time>src->time_delta_continous_error_min){
-    src->big_textline.show_time=0;
-  }
-
-  for(i=0;i<history_errors_full_size;i++){
-    if(time_val-src->history_textlines[i].error_last_time>src->time_delta_continous_error_min){
-      src->history_textlines[i].show_time=0;
-    }
-  }
-
-}
-
-//show_time_flag_override=-1 = no override
-//error_create_time_overridee<0.0 = no override
-gboolean gldraw_add_error_code(GlDrawing *src, int code,int show_time_flag_override, double error_create_time_override, double error_last_time_override){
-
-  int i;
-  int find;
-  int free_slots;
-  int flag;
-  TextRect tr;
-
-  if(code<0 || code>=all_errors_count)return FALSE;
-
-  if(src->gl_drawing_created==0){
-
-    find=-1;
-    for(i=0;i<history_errors_full_size;i++){
-      if(src->history_textlines[i].error_selected==code &&
-         src->history_textlines[i].show_time==1){
-        find=i;
-        break;
-      }
-    }
-
-    if(find>=0){
-      set_text_line_flags(src,&src->history_textlines[find],code,-1,1,getCurrentTime());
-    }
-    else{
-
-      for(i=history_errors_full_size-1;i>0;i--){
-        src->history_textlines[i]=src->history_textlines[i-1];
-      }
-
-      set_text_line_flags(src,&src->history_textlines[0],code,1,1,getCurrentTime());
-
-    }
-
-
-
-
-  }
-  else {
-/*
-    int first_line_lower_window;
-
-    first_line_lower_window=history_errors_window_size+floor((-src->history_textlines_shift_y)/calc_history_one_line_ly(src));
-
-    TextRect tr;
-
-    if(first_line_lower_window>=0 && first_line_lower_window<history_errors_full_size){
-      if(src->history_textlines[first_line_lower_window].this_enabled==1 &&
-         src->history_textlines[first_line_lower_window].show_time==1){
-        tr=src->history_textlines[first_line_lower_window];
-        for(i=history_errors_full_size-1;i>0;i--){
-          src->history_textlines[i]=src->history_textlines[i-1];
-        }
-        src->history_textlines[0]=tr;
-        if(first_line_lower_window+1<history_errors_full_size)
-          src->history_textlines[first_line_lower_window+1].this_enabled=0;
-        src->history_textlines_shift_y-=calc_history_one_line_ly(src);
-      }
-    }
-*/
-
-/*
-      flag=1;
-      while(flag){
-        flag=0;
-        for(i=0;i<history_errors_full_size-1;i++){
-            if(src->history_textlines[i].show_time==0 &&
-               src->history_textlines[i+1].show_time==1){
-              tr=src->history_textlines[i];
-              src->history_textlines[i]=src->history_textlines[i+1];
-              src->history_textlines[i+1]=tr;
-              flag=1;
-            }
-        }
-      }
-*/
-    find=-1;
-    for(i=0;i<history_errors_full_size;i++){
-      if(src->history_textlines[i].error_selected==code &&
-         src->history_textlines[i].show_time==1){
-        find=i;
-        break;
-      }
-    }
-
-    if(find>=0){
-      set_text_line_flags(src,&src->history_textlines[find],code,-1,1,getCurrentTime());
-    }
-    else{
-
-        free_slots=((history_errors_full_size-history_errors_window_size)*calc_history_one_line_ly(src)+src->history_textlines_shift_y)/calc_history_one_line_ly(src);
-
-        if(free_slots>0){
-          for(i=history_errors_full_size-1;i>0;i--){
-            src->history_textlines[i]=src->history_textlines[i-1];
-          }
-          src->history_textlines_shift_y-=calc_history_one_line_ly(src);
-        }
-        else{
-          for(i=history_errors_window_size-1;i>0;i--){
-            src->history_textlines[i]=src->history_textlines[i-1];
-          }
-        }
-
-        if(show_time_flag_override==-1)set_text_line_flags(src,&src->history_textlines[0],code,1,1,getCurrentTime());
-        else set_text_line_flags(src,&src->history_textlines[0],code,1,show_time_flag_override,getCurrentTime());
-
-        if(error_create_time_override>=0.0){
-            src->history_textlines[0].error_create_time=error_create_time_override;
-        }
-        if(error_last_time_override>=0.0){
-            src->history_textlines[0].error_last_time=error_last_time_override;
-        }
-
-
-      }
-
-
-
-
-  }
-
-
-  return TRUE;
+  src->history_textlines_shift_y=-calc_history_one_line_ly(src);
 
 }
 
@@ -532,15 +375,21 @@ gboolean gldraw_add_error_code(GlDrawing *src, int code,int show_time_flag_overr
 
 
 
-
-void calc_one_line(TextRect *text_line,
+//fonts_num must <= SELECTED_FONT_PTRS_NUM
+void calc_one_line(GstClock *pipeline_clock,
+                   TextRect *text_line,
                    float x, float y, float lx, float ly,
-                   struct nk_font *font_ptr,
+                   struct nk_font **_fonts_ptrs,
+                   int fonts_num,
+                   struct nk_font *_font_time_text_ptr,
                    float text_x_caption_begin_percent, float text_x_caption_end_percent,
                    float text_x_time_begin_percent, float text_x_time_end_percent,
                    float text_y,
                    float border_thick,
-                   int time_text_visible){
+                   float *color_text //argb float[4]
+                   ){
+
+      int i;
 
      //text_line=&src->small_textlines[i];
 
@@ -559,71 +408,160 @@ void calc_one_line(TextRect *text_line,
 
       text_line->border_blink_flag=0;
 
-      text_line->time_text_visible=time_text_visible;
+      //text_line->time_text_visible=time_text_visible;
 
       text_line->background_enabled_flag=1;
 
-      text_line->text_x=text_line->x+text_x_caption_begin_percent*text_line->lx;
-      text_line->text_y=text_line->y+text_y-text_line->border_thick/2.0;
-      text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
-      if(font_ptr!=NULL)text_line->text_ly=font_ptr->info.height;
+      //if(_fonts_ptrs!=NULL)text_line->text_ly=font_ptr->info.height;
 
-      text_line->selected_font_ptr=font_ptr;
+      for(i=0;i<fonts_num;i++){
+        text_line->fonts_ptrs[i]=_fonts_ptrs[i];
+      }
+      text_line->fonts_ptrs_num=fonts_num;
+
+      text_line->font_time_text_ptr=_font_time_text_ptr;
+
+      //text_line->selected_font_ptr=font_ptr;
+
+      int severity;
+
+      severity=text_line->displayedErrorData.severity;
+      severity=CLAMP(severity, 0, SEVERITY_COUNT-1);
 
       memcpy(text_line->border_color,
-             errors_properties[text_line->error_selected].border_color,
+             errors_properties[severity].border_color,
              4*sizeof(float));
 
       memcpy(text_line->background_color,
-             errors_properties[text_line->error_selected].background_color,
+             errors_properties[severity].background_color,
              4*sizeof(float));
 
-      memcpy(text_line->text_color,
-             errors_properties[text_line->error_selected].text_color,
-             4*sizeof(float));
+      //memcpy(text_line->text_color,
+      //       errors_properties[severity].text_color,
+      //       4*sizeof(float));
+
+      text_line->text_color[0]=color_text[1];
+      text_line->text_color[1]=color_text[2];
+      text_line->text_color[2]=color_text[3];
+      text_line->text_color[3]=color_text[0];
 
       int len;
       int len_cut;
       int max_text_len_pixels;
 
-      len=strlen(errors_properties[text_line->error_selected].full_text);
+
+/*            for(i=0;i<fonts_num;i++){
+        text_line->fonts_ptrs[i]=_fonts_ptrs[i];
+      }*/
+
+
+
+      len=strlen(text_line->displayedErrorData.msg);
       max_text_len_pixels=text_line->text_lx;
+
+      for(i=0;i<text_line->fonts_ptrs_num;i++){
+
+         len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[i],
+                                                  text_line->displayedErrorData.msg,
+                                                  max_text_len_pixels-10);
+         text_line->fonts_ptr_selected=i;
+         if(len==len_cut){
+           break;
+         }
+      }
+
+
       if(len>0 && len<text_line_size){
 
-         len_cut=calc_cut_string_len_in_chars_num(text_line->selected_font_ptr,
-                                                  errors_properties[text_line->error_selected].full_text,
-                                                  max_text_len_pixels);
+         //len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[text_line->fonts_ptr_selected],
+         //                                         text_line->displayedErrorData.msg,
+         //                                         max_text_len_pixels);
 
-         memcpy(text_line->text_line,
-                errors_properties[text_line->error_selected].full_text,
+
+
+         if(len_cut>0){
+
+           memcpy(text_line->text_line,
+                text_line->displayedErrorData.msg,
                 len_cut);
 
-         text_line->text_line[len_cut]=0;
+           if(len!=len_cut){
+             text_line->text_line[len_cut]=':';
+           }
+
+           text_line->text_line[len_cut+1]=0;
+
+         }else{
+           text_line->text_line[0]=0;
+         }
+
+
          //text_line->text_line[len_cut+1]=0;
 
       }
 
-      text_line->text_time_x=text_line->x+text_x_time_begin_percent*text_line->lx;
-      text_line->text_time_y=text_line->y+text_y-text_line->border_thick/2.0;
-      text_line->text_time_lx=text_x_time_end_percent*text_line->lx-text_line->x;
-      if(font_ptr!=NULL)text_line->text_time_ly=font_ptr->info.height;
 
-      double delta_time;
-      delta_time=getCurrentTime()-text_line->error_create_time;
-      if(delta_time<60.0){//seconds
-        sprintf(text_line->text_time,"%ds",(int)(delta_time));
-      }else
-      if(delta_time<60.0*60.0){//minutes
-        sprintf(text_line->text_time,"%dm",(int)(delta_time/60.0));
-      }else
-      if(delta_time<60.0*60.0*24.0){//hours
-        sprintf(text_line->text_time,"%dh",(int)(delta_time/60.0/60.0));
-      }else
-      if(delta_time<60.0*60.0*30.0){//days
-        sprintf(text_line->text_time,"%dd",(int)(delta_time/60.0/60.0/24.0));
-      }else{
-        sprintf(text_line->text_time,"month");
+
+
+      if(_fonts_ptrs!=NULL)text_line->text_ly=_fonts_ptrs[text_line->fonts_ptr_selected]->info.height;
+      text_line->text_x=text_line->x+text_x_caption_begin_percent*text_line->lx;
+      text_line->text_y=text_line->y+text_line->ly/2.0-text_line->text_ly/2.0;//text_line->y+text_y-text_line->border_thick/2.0;
+      text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
+
+
+
+      double showed_time;
+      __uint64_t current_time;
+
+      int d,h,m,s;
+      int val;
+
+      current_time=0;
+      //if(text_line->displayedErrorData.pipeline_clock==NULL)return;
+      if(GST_IS_CLOCK(pipeline_clock)){
+        current_time=gst_clock_get_time(pipeline_clock);
       }
+
+
+
+      if(text_line->displayedErrorData.flag_is_continuous==1){
+        showed_time=(current_time-text_line->displayedErrorData.timestamp)/1000000000;
+
+        val=(int)(showed_time);
+
+        d=val/60/60/24;
+        val=val-d*60*60*24;
+
+        h=val/60/60;
+        val=val-h*60*60;
+
+        m=val/60;
+        val=val-m*60;
+
+        s=val;
+
+        sprintf(text_line->text_time,"%02d:%02d:%02d:%02d",d,h,m,s);
+
+
+      }else{
+
+        sprintf(text_line->text_time,"%02d:%02d:%02d:%02d",
+                text_line->displayedErrorData.creation_time_d,
+                text_line->displayedErrorData.creation_time_h,
+                text_line->displayedErrorData.creation_time_m,
+                text_line->displayedErrorData.creation_time_s);
+
+      }
+
+      if(_fonts_ptrs!=NULL)text_line->text_time_ly=text_line->font_time_text_ptr->info.height;
+      text_line->text_time_x=text_line->x+text_x_time_begin_percent*text_line->lx;
+      text_line->text_time_y=text_line->y+text_line->ly/2.0-text_line->text_time_ly/2.0;//-text_line->border_thick/2.0;
+      text_line->text_time_x_zone_begin=text_line->x+text_x_time_begin_percent*text_line->lx;
+      text_line->text_time_x_zone_end=text_line->x+text_x_time_end_percent*text_line->lx;
+      //text_line->text_time_lx=text_line->text_time_x_zone_end-text_line->text_time_x_zone_begin;
+      nk_handle handle1;
+      handle1.ptr=_font_time_text_ptr;
+      text_line->text_time_lx=nk_font_text_width(handle1,_font_time_text_ptr->info.height,text_line->text_time,strlen(text_line->text_time));
 
 }
 
@@ -641,26 +579,6 @@ void calc_all_draw_sizes(GlDrawing *src){
 
 
 
-  update_errors_time(src);
-
-  first_line_lower_window=history_errors_window_size+floor((-src->history_textlines_shift_y)/calc_history_one_line_ly(src));
-
-  TextRect tr;
-
-  if(first_line_lower_window>=0 && first_line_lower_window<history_errors_full_size){
-    if(src->history_textlines[first_line_lower_window].this_enabled==1 &&
-       src->history_textlines[first_line_lower_window].show_time==1){
-      tr=src->history_textlines[first_line_lower_window];
-      for(i=history_errors_full_size-1;i>0;i--){
-        src->history_textlines[i]=src->history_textlines[i-1];
-      }
-      src->history_textlines[0]=tr;
-      if(first_line_lower_window+1<history_errors_full_size)
-        src->history_textlines[first_line_lower_window+1].this_enabled=0;
-      src->history_textlines_shift_y-=calc_history_one_line_ly(src);
-    }
-  }
-
 
 
   x=0.05*src->width;
@@ -668,21 +586,28 @@ void calc_all_draw_sizes(GlDrawing *src){
   lx=src->width-x*2;
   ly=calc_history_one_line_ly(src);
 
-  for(i=0;i<history_errors_full_size;i++){
+  struct nk_font *input_fonts[SELECTED_FONT_PTRS_NUM];
 
-      calc_one_line(&src->history_textlines[i],
-                   x, y, lx, ly,
-                   src->font_small_text_line,
-                   0.1, 0.78,
-                   0.85, 0.9,
-                   ly/2-src->font_small_text_line->info.height/2,
-                   src->height/150.0,
-                   1);
+  input_fonts[0]=src->font_small_text_line;
+  for(i=0;i<gldraw_get_history_errors_full_size(src);i++){
+
+      calc_one_line(src->pipeline_clock,
+                    &src->history_textlines[i],
+                    x, y, lx, ly,
+                    input_fonts,1,
+                    src->font_small_text_line,
+                    0.05, 0.68,
+                    0.77, 0.95,
+                    ly/2-src->font_small_text_line->info.height/2,
+                    src->height/150.0,
+                    src->color_text);
 
 
       y=y+ly;
 
-      if(y+src->history_textlines_shift_y>src->history_textlines_y+src->history_textlines_ly)src->history_textlines[i].this_enabled=0;
+      if(y+src->history_textlines_shift_y>src->history_textlines_y+src->history_textlines_ly+0.01){
+         src->history_textlines[i].displayedErrorData.flag_show_this=0;
+      }
 
   }
 
@@ -691,24 +616,31 @@ void calc_all_draw_sizes(GlDrawing *src){
   ly=calc_bigtextline_ly(src);
   y=src->history_textlines_y-ly;
 
-  calc_one_line(&src->big_textline,
-                   x, y, lx, ly,
-                   src->font_big_text_line,
-                   0.082, 0.7,
-                   0.82, 0.9,
-                   ly/2-src->font_big_text_line->info.height/2,
-                   src->height/120.0,
-                   1);
+  input_fonts[0]=src->font_big_text_line;
+  input_fonts[1]=src->font_medium_text_line;
+  input_fonts[2]=src->font_small_text_line;
+  calc_one_line(src->pipeline_clock,
+                &src->big_textline,
+                x, y, lx, ly,
+                input_fonts,3,
+                src->font_medium_text_line,
+                0.05, 0.68,
+                0.77, 0.95,
+                ly/2-src->font_big_text_line->info.height/2,
+                src->height/120.0,
+                src->color_text);
 
 
-  calc_one_line(&src->big_flash_rect,
-                   0, 0, src->width, src->height,
-                   NULL,
-                   0, 0,
-                   0, 0,
-                   0,
-                   src->height/90.0,
-                   0);
+  calc_one_line(src->pipeline_clock,
+                &src->big_flash_rect,
+                0, 0, src->width, src->height,
+                NULL,0,
+                src->font_small_text_line,
+                0, 0,
+                0, 0,
+                0,
+                src->height/90.0,
+                src->color_text);
 
 
 }
@@ -719,42 +651,101 @@ void calc_all_draw_sizes(GlDrawing *src){
 
 
 
+void find_font_file(GlDrawing *src){
 
-gboolean gldraw_clear_errors(GlDrawing *src){
-
-  //src->errors_updated_flag=1;
-
-  //for(int i=0;i<all_errors_count;i++){
-  //  src->error_enabled_flag[i]=0;
-  //}
-
-  //src->last_error_code=ERROR_CODE_ERROR_NONE;
-  //src->last_error_begin_time=getCurrentTime()-10.0;
-
+  FcConfig* config = FcInitLoadConfigAndFonts();
+  FcPattern* pat = FcPatternCreate();
+  FcObjectSet* os = FcObjectSetBuild (FC_FAMILY, FC_STYLE, FC_LANG, FC_FILE, (char *) 0);
+  FcFontSet* fs = FcFontList(config, pat, os);
+  //printf("Total matching fonts: %d\n", fs->nfont);
+  FcChar8 *file, *style, *family;
+  file=NULL;//(FcChar8 *)src->font_caption;
+  style=NULL;
+  family=NULL;
+  //int k;
   int i;
 
-  for(i=0;i<history_errors_full_size;i++){
-    src->history_textlines[i].this_enabled=0;
-    src->history_textlines[i].error_last_time=-1;
-    src->history_textlines[i].error_selected=0;//dummy error
+
+
+  for (i=0; fs && i < fs->nfont; ++i) {
+     FcPattern* font = fs->fonts[i];
+
+     if (FcPatternGetString(font, FC_FILE, 0, &file) == FcResultMatch &&
+         FcPatternGetString(font, FC_FAMILY, 0, &family) == FcResultMatch &&
+         FcPatternGetString(font, FC_STYLE, 0, &style) == FcResultMatch)
+     {
+        //sprintf(buf,"Filename: [%s] family: [%s] style: [%s]\n", file, family, style);
+        //write(file1,buf,strlen(buf));
+        if(strcmp(family,src->font_caption)==0 &&
+           strcmp(style,src->font_style)==0){
+            strcpy(src->font_full_filename,file);
+            FcFontSetDestroy(fs);
+            return;
+        }
+
+     }
   }
+  if (fs) FcFontSetDestroy(fs);
 
-
-  return TRUE;
+  src->font_full_filename[0]=0;
 
 }
 
 
+void gldraw_set_font_style(GlDrawing *src, char *_font_style){
 
+  strcpy(src->font_style, _font_style);
+
+}
+
+char *gldraw_get_font_style(GlDrawing *src){
+
+  return src->font_style;
+
+}
+
+void gldraw_set_font_caption(GlDrawing *src, char *_font_caption){
+
+  strcpy(src->font_caption, _font_caption);
+
+
+}
+
+char *gldraw_get_font_caption(GlDrawing *src){
+
+  return src->font_caption;
+
+}
 
 void gldraw_first_init(GlDrawing *src){
+
+  src->error_draw_callback=NULL;
+  src->error_draw_callback_receiver=NULL;
 
   src->gl_drawing_created=0;
   //src->error_codes_at_create=-1;
 
+  src->font_full_filename[0]=0;
+  gldraw_set_font_caption(src, FONT_CAPTION_DEFAULT);
+  gldraw_set_font_style(src, FONT_STYLE_DEFAULT);
+//  find_font_file(src);
+
   src->all_context_nk=NULL;
   src->font_small_text_line=NULL;
   src->font_big_text_line=NULL;
+
+  //argb
+  src->color_background[0]=128;
+  src->color_background[1]=255;
+  src->color_background[2]=255;
+  src->color_background[3]=255;
+
+  src->color_text[0]=255;
+  src->color_text[1]=0;
+  src->color_text[2]=0;
+  src->color_text[3]=0;
+
+
 
   src->history_textlines_shift_y=0;
   //seconds
@@ -762,9 +753,18 @@ void gldraw_first_init(GlDrawing *src){
   src->time_big_text_capture_time=3.0;
   src->time_big_rect_flash_delta=2.0;
 
+  memset(&src->big_textline,0,sizeof(TextRect));
+  memset(src->history_textlines,0,sizeof(TextRect)*history_errors_full_max_size);
+  memset(&src->big_flash_rect,0,sizeof(TextRect));
+
+  gldraw_set_history_errors_window_size(src, 5);
+
+
   //---
 
-  gldraw_clear_errors(src);
+  //gldraw_clear_errors(src);
+
+
 
 
   //---
@@ -772,6 +772,30 @@ void gldraw_first_init(GlDrawing *src){
 }
 
 
+void gldraw_clear_errors(GlDrawing *src){
+
+  src->history_textlines_shift_y=0;
+
+  int i;
+
+  src->big_textline.displayedErrorData.id=0;
+  src->big_textline.displayedErrorData.flag_show_this=0;
+
+  src->big_flash_rect.displayedErrorData.id=0;
+  src->big_flash_rect.displayedErrorData.flag_show_this=0;
+
+  for(i=0;i<history_errors_full_max_size;i++){
+    src->history_textlines[i].displayedErrorData.id=0;
+    src->history_textlines[i].displayedErrorData.flag_show_this=0;
+
+  }
+
+  //memset(&src->big_textline,0,sizeof(TextRect));
+  //memset(src->history_textlines,0,sizeof(TextRect)*history_errors_full_max_size);
+  //memset(&src->big_flash_rect,0,sizeof(TextRect));
+
+
+}
 
 
 gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
@@ -791,6 +815,9 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 
     gldraw_close(context,src);
 
+    find_font_file(src);
+    if(src->font_full_filename[0]==0)return FALSE;
+
     src->width=width;
     src->height=height;
     src->fps=fps;
@@ -803,7 +830,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
     src->all_context_nk=malloc(sizeof(struct nk_custom));
     memset(&src->all_context_nk->ogl.cmds,0,sizeof(src->all_context_nk->ogl.cmds));
 
-    int MAX_MEMORY=10000000;
+    //int MAX_MEMORY=10000000;
 
 
     nk_init_default(&src->all_context_nk->ctx, 0);
@@ -820,10 +847,10 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 //<<<<<<<<<<? free?
 */
 
-    GLint status;
+    //GLint status;
 
 
-    struct nk_sdl_device *dev = &src->all_context_nk->ogl;
+    //struct nk_sdl_device *dev = &src->all_context_nk->ogl;
 
     GError *error = NULL;
 
@@ -892,24 +919,31 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 //<<<<<<<<<<? free?
 
    // if(src->width>src->height){
-    font_size=calc_history_one_line_ly(src)/1.4;//*w/h*3.0/4.0;
+    font_size=calc_history_one_line_ly(src)/1.7;//*w/h*3.0/4.0;
     if(h*1.2>w)font_size*=w/h*3.0/4.0;
-    //}else {
-     // font_size=calc_history_one_line_ly(src)/2;
-    //}
     if(font_size<5)font_size=5;
-
     src->font_small_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
-                              "/root/Desktop/distr/03.guis/nuklear/glsoundbar/glsoundbar/glsoundbar/src/DroidSans.ttf",
+                              src->font_full_filename,
                               font_size, &conf);
 
-    font_size=calc_bigtextline_ly(src)/2.0;
+
+
+
+    font_size=calc_bigtextline_ly(src)/2.0;//*w/h*3.0/4.0;
     if(h*1.2>w)font_size*=w/h*3.0/4.0;
-    if(font_size<9)font_size=9;
-
+    if(font_size<5)font_size=5;
     src->font_big_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
-                              "/root/Desktop/distr/03.guis/nuklear/glsoundbar/glsoundbar/glsoundbar/src/DroidSans.ttf",
+                              src->font_full_filename,
                               font_size, &conf);
+
+
+    font_size/=1.7;
+    src->font_medium_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
+                              src->font_full_filename,
+                              font_size, &conf);
+
+
+
 
 
 
@@ -929,10 +963,10 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
         nk_style_set_font(&src->all_context_nk->ctx, &src->all_context_nk->atlas.default_font->handle);
 
 
-    int len1;
+    //int len1;
     nk_handle handle1;
     handle1.ptr=src->font_small_text_line;
-    len1=nk_font_text_width(handle1,16,"asdfb",5);
+    //len1=nk_font_text_width(handle1,16,"asdfb",5);
 
 
 
@@ -978,7 +1012,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 /*
   int errors_updated_flag;
 
-  int error_enabled_flag[all_errors_count];
+  int error_enabled_flag[SEVERITY_COUNT];
 
   int    last_error_code;
   double last_error_begin_time;
@@ -990,7 +1024,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
   float small_textlines_num;
 
   TextRect big_textline;
-  TextRect small_textlines[all_errors_count];
+  TextRect small_textlines[SEVERITY_COUNT];
   TextRect big_flash_rect;
 */
 
@@ -1048,24 +1082,20 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
     int i;
 
-/*
-    if(src->errors_updated_flag==1){
-      calc_all_draw_sizes(context, src);
-      src->errors_updated_flag=0;
-    }
-*/
+    if(src->font_full_filename[0]==0)return FALSE;
 
+
+
+
+    fire_error_draw_callback(src, ERROR_DRAW_CALLBACK_EVENT_BEGIN_FRAME);
+
+    if(src->history_textlines_shift_y>=0)fire_error_draw_callback(src, ERROR_DRAW_CALLBACK_EVENT_LIST_MOVE_END);
 
 
     calc_all_draw_sizes(src);
-
     move_history_textlines_shift_y_one_frame(src);
 
-/*
-    for(i=0;i<history_errors_full_size;i++){
-      calc_one_line()
-    }
-*/
+
     nk_buffer_init_default(&src->all_context_nk->ogl.cmds);
 
     struct nk_style_window window_default_padding;
@@ -1096,7 +1126,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
     src->all_context_nk->ctx.style.window=window_zero_padding;
 
-    struct nk_rect bounds;
+    //struct nk_rect bounds;
 
     src->all_context_nk->ctx.style.window.background=nk_rgba(0,0,0,0);
     src->all_context_nk->ctx.style.window.fixed_background.data.color=nk_rgba(0,0,0,0);
@@ -1111,7 +1141,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     if (nk_begin(&src->all_context_nk->ctx, "Demo", nk_rect(0, 0, src->width, src->height),NK_WINDOW_NO_SCROLLBAR))
     {
 
-        char buf[100];
+        //char buf[100];
 
         //nk_layout_row_static(&src->all_context_nk->ctx, 15, 70, 1);sprintf(buf,"b=%d",test1);test1++;nk_button_label(&src->all_context_nk->ctx, buf);
         //nk_layout_row_static(&src->all_context_nk->ctx, 20, 75, 1);sprintf(buf,"b=%d",test1);test1++;nk_button_label(&src->all_context_nk->ctx, buf);
@@ -1124,7 +1154,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         //nk_layout_row_static(&src->all_context_nk->ctx, src->height, src->width, 1);
 
 
-        nk_fill_rect(commands, nk_rect(0,0,src->width,src->height), 0, nk_rgba(255, 255, 255, 100));
+        nk_fill_rect(commands, nk_rect(0,0,src->width,src->height), 0,
+                     nk_rgba(src->color_background[1], src->color_background[2], src->color_background[3], src->color_background[0]));
+
 
 
         double cur_time=getCurrentTime();
@@ -1134,43 +1166,56 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         blink_flag=0;
         if(cur_time-floor(cur_time/src->time_big_rect_flash_delta)*src->time_big_rect_flash_delta<0.5*src->time_big_rect_flash_delta)blink_flag=1;
 
-        if(cur_time-src->big_textline.error_capture_begin_time > src->time_big_text_capture_time &&
-           src->big_textline.show_time==0)blink_flag=1;
+        //if(cur_time-src->big_textline.error_capture_begin_time > src->time_big_text_capture_time &&
+        //   src->big_textline.show_time==0)blink_flag=1;
 
 
         tr=&src->big_flash_rect;
-        if(blink_flag==1){
-          nk_stroke_rect(commands, nk_rect(tr->border_x+0.0,tr->border_y+0.0,tr->border_lx+0.0,tr->border_ly+0.0), tr->border_thick*3, tr->border_thick,
+        if(tr->displayedErrorData.flag_show_this==1){
+          if(tr->displayedErrorData.flag_allow_rect_blink==1 && tr->displayedErrorData.flag_is_continuous==1){
+            if(blink_flag==1){
+              nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
                          nk_rgba(src->big_textline.border_color[0],
                                  src->big_textline.border_color[1],
                                  src->big_textline.border_color[2],
                                  src->big_textline.border_color[3]));
+            }
+          }else{
+              nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
+                         nk_rgba(src->big_textline.border_color[0],
+                                 src->big_textline.border_color[1],
+                                 src->big_textline.border_color[2],
+                                 src->big_textline.border_color[3]));
+
+          }
         }
 
 
 
 
         nk_layout_row_static(&src->all_context_nk->ctx, src->history_textlines_y, src->width, 1);
+        //nk_layout_row_static(&src->all_context_nk->ctx, 0, src->width, 1);
+
         if (nk_group_begin(&src->all_context_nk->ctx, "Group0", NK_WINDOW_NO_SCROLLBAR)) {
 
 
 
            tr=&src->big_textline;
-            if(tr->this_enabled==1){
+            if(tr->displayedErrorData.flag_show_this==1){
                 if(tr->background_enabled_flag==1)
-                  nk_fill_rect(commands, nk_rect(tr->x+0.0,tr->y+0.0,tr->lx+0.0,tr->ly+0.0), tr->border_thick*3, nk_rgba(tr->background_color[0],
+                  nk_fill_rect(commands, nk_rect(tr->x,tr->y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
                                                                                          tr->background_color[1],
                                                                                          tr->background_color[2],
                                                                                          tr->background_color[3]));
 
-                nk_stroke_rect(commands, nk_rect(tr->border_x+0.0,tr->border_y+0.0,tr->border_lx+0.0,tr->border_ly+0.0), tr->border_thick*3, tr->border_thick,
+                nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
                                  nk_rgba(tr->border_color[0],
                                          tr->border_color[1],
                                          tr->border_color[2],
                                          tr->border_color[3]));
 
-                nk_draw_text(commands, nk_rect(tr->text_x+0.0,tr->text_y+0.0,tr->text_lx+0.0,tr->text_ly+0.0),
-                               tr->text_line, strlen(tr->text_line), &src->font_big_text_line->handle,//src->font_small_text_line,
+                nk_draw_text(commands, nk_rect(tr->text_x,tr->text_y,tr->text_lx,tr->text_ly),
+                               tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle, //&src->font_big_text_line->handle,//src->font_small_text_line,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1181,10 +1226,11 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                        tr->text_color[3]));
 
 
-                if(tr->show_time==1 && tr->time_text_visible==1 &&
-                   getCurrentTime()-tr->error_create_time>src->time_delta_continous_error_min){
-                     nk_draw_text(commands, nk_rect(tr->text_time_x+0.0,tr->text_time_y+0.0,tr->text_time_lx+0.0,tr->text_time_ly+0.0),
-                               tr->text_time, strlen(tr->text_time), &src->font_big_text_line->handle,//src->font_small_text_line,
+                if(tr->displayedErrorData.flag_show_time==1){
+                     //nk_draw_text(commands, nk_rect(tr->text_time_x,tr->text_time_y,tr->text_time_lx,tr->text_time_ly),
+                     nk_draw_text(commands, nk_rect(tr->text_time_x_zone_end-tr->text_time_lx,tr->text_time_y,tr->text_time_lx,tr->text_time_ly),
+
+                               tr->text_time, strlen(tr->text_time), &tr->font_time_text_ptr->handle,//&src->font_big_text_line->handle,//src->font_small_text_line,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1197,45 +1243,41 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
 
 
+            }else{
+              int pp;
+              pp=0;
+
             }
 
            nk_group_end(&src->all_context_nk->ctx);
         }
 
         nk_layout_row_static(&src->all_context_nk->ctx, src->history_textlines_ly, src->width, 1);
-
+        //nk_layout_row_static(&src->all_context_nk->ctx, src->height, src->width, 1);
 
         if (nk_group_begin(&src->all_context_nk->ctx, "Group1", NK_WINDOW_NO_SCROLLBAR)) {
 
 
 
 
-/*
-            nk_fill_rect(commands, nk_rect(10.0,src->history_textlines_y+10.0,100.0,1000.0), 10, nk_rgba(0,255,0,255));
-            nk_fill_rect(commands, nk_rect(20.0,src->history_textlines_y+20.0,100.0,1000.0), 10, nk_rgba(255,255,0,255));
-            nk_fill_rect(commands, nk_rect(40.0,src->history_textlines_y+40.0,100.0,1000.0), 10, nk_rgba(255,255,255,255));
-            nk_fill_rect(commands, nk_rect(60.0,src->history_textlines_y+80.0,100.0,1000.0), 10, nk_rgba(255,0,255,255));
-            nk_fill_rect(commands, nk_rect(80.0,src->history_textlines_y+120.0,100.0,1000.0), 10, nk_rgba(255,0,0,255));
-*/
 
-
-            for(i=0;i<history_errors_full_size;i++){
+            for(i=0;i<gldraw_get_history_errors_full_size(src);i++){
               tr=&src->history_textlines[i];
-              if(tr->this_enabled==1){
+              if(tr->displayedErrorData.flag_show_this==1){
                   if(tr->background_enabled_flag==1)
-                    nk_fill_rect(commands, nk_rect(tr->x+0.0,tr->y+0.0+src->history_textlines_shift_y,tr->lx+0.0,tr->ly+0.0), tr->border_thick*3, nk_rgba(tr->background_color[0],
+                    nk_fill_rect(commands, nk_rect(tr->x,tr->y+src->history_textlines_shift_y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
                                                                                          tr->background_color[1],
                                                                                          tr->background_color[2],
                                                                                          tr->background_color[3]));
 
-                  nk_stroke_rect(commands, nk_rect(tr->border_x+0.0,tr->border_y+0.0+src->history_textlines_shift_y,tr->border_lx+0.0,tr->border_ly+0.0), tr->border_thick*3, tr->border_thick,
+                  nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y+src->history_textlines_shift_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
                                  nk_rgba(tr->border_color[0],
                                          tr->border_color[1],
                                          tr->border_color[2],
                                          tr->border_color[3]));
 
-                  nk_draw_text(commands, nk_rect(tr->text_x+0.0,tr->text_y+0.0+src->history_textlines_shift_y,tr->text_lx+0.0,tr->text_ly+0.0),
-                               tr->text_line, strlen(tr->text_line), &src->font_small_text_line->handle,//src->all_context_nk->ctx.style.font,
+                  nk_draw_text(commands, nk_rect(tr->text_x,tr->text_y+src->history_textlines_shift_y,tr->text_lx,tr->text_ly),
+                               tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle,//&src->font_small_text_line->handle,//src->all_context_nk->ctx.style.font,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1246,10 +1288,11 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                        tr->text_color[3]));
 
 
-                if(tr->show_time==1 && tr->time_text_visible==1 &&
-                   getCurrentTime()-tr->error_create_time>src->time_delta_continous_error_min){
-                  nk_draw_text(commands, nk_rect(tr->text_time_x+0.0,tr->text_time_y+0.0+src->history_textlines_shift_y,tr->text_time_lx+0.0,tr->text_time_ly+0.0),
-                               tr->text_time, strlen(tr->text_time), &src->font_small_text_line->handle,//src->font_small_text_line,
+                if(tr->displayedErrorData.flag_show_time==1){
+
+                  //nk_draw_text(commands, nk_rect(tr->text_time_x,tr->text_time_y+src->history_textlines_shift_y,tr->text_time_lx,tr->text_time_ly),
+                  nk_draw_text(commands, nk_rect(tr->text_time_x_zone_end-tr->text_time_lx,tr->text_time_y+src->history_textlines_shift_y,tr->text_time_lx,tr->text_time_ly),
+                               tr->text_time, strlen(tr->text_time), &tr->font_time_text_ptr->handle,//&src->font_small_text_line->handle,//src->font_small_text_line,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1276,7 +1319,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     nk_end(&src->all_context_nk->ctx);
 
 
-    struct nk_vec2 scale;
+    //struct nk_vec2 scale;
 
     GLfloat ortho[4][4] = {
         {2.0f, 0.0f, 0.0f, 0.0f},
@@ -1360,8 +1403,8 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
             //nk_buffer_free(&vbuf);
             //nk_buffer_free(&ebuf);
 
-            int a;
-            a=0;
+            //int a;
+            //a=0;
 
             //}
 
@@ -1373,8 +1416,8 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, (size_t)src->all_context_nk->ctx.draw_list.elements->memory.size,
                    src->all_context_nk->ctx.draw_list.elements->memory.ptr, GL_STATIC_DRAW);
 
-    scale.x = 1.0;//(float)display_width/(float)width;
-    scale.y = 1.0;//(float)display_height/(float)height;
+    //scale.x = 1.0;//(float)display_width/(float)width;
+    //scale.y = 1.0;//(float)display_height/(float)height;
 
     // iterate over and execute each draw command
     nk_draw_foreach(cmd, &src->all_context_nk->ctx, &src->all_context_nk->ogl.cmds) {
