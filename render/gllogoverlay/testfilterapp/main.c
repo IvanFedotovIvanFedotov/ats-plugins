@@ -876,7 +876,7 @@ gint pipeline_test (gint argc, gchar *argv[])
 				     "framerate", GST_TYPE_FRACTION, 0, 1,
 				     NULL), NULL);
 */
-  		gst_caps_new_simple ("ANY",NULL),
+  		gst_caps_new_simple ("application/x-bin-error-log",NULL),
   	  NULL);
 
       gst_bin_add_many (GST_BIN (pipeline),
