@@ -14,7 +14,7 @@ clean: create_build_dir clean_build_dir
 install: clean build copy_lib_to_pluginsdir
 
 
-build: gstgltextoverlay.o gldrawing.o errorshandler.o
+build: gstgltextoverlay.o gldrawing.o
 	@$(CC) $(LDFLAGS) ../build/gstgltextoverlay.o ../build/gldrawing.o -o ../build/libgstgltextoverlay.so
 
 gstgltextoverlay.o:
