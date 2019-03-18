@@ -38,11 +38,9 @@ void errors_handler_clear(GlDrawing *gldrw_src, ErrorsHandler *src){
 
   src->ERBbegin=0;
   src->ERBlen=0;
-  //memset(src->ErrorsRingBuf,0,ERRORS_RING_BUF_SIZE*sizeof(InputErrorEx));
   src->capture_time_end=0;
   src->SortedErrorsArr_size=0;
   src->errors_in_history_num=0;
-  //memset(&src->past_first_error,0,sizeof(InputErrorEx));
   src->animation_move_down_flag=0;
 
 }
@@ -86,7 +84,6 @@ void add_error_to_ERB(ErrorsHandler *src, InputErrorEx *inpError){
 
   }
 
-
   if(find==0){
    ERBbegin--;
    if(ERBbegin<0){
@@ -102,14 +99,10 @@ void add_error_to_ERB(ErrorsHandler *src, InputErrorEx *inpError){
    src->ErrorsRingBuf[ERBbegin].id=src->global_id;
    src->ERBbegin=ERBbegin;
    src->ERBlen=ERBlen;
-
-
-
    src->errors_added_num++;
    src->errors_added_num=CLAMP(src->errors_added_num,0,MAX(0,ERRORS_RING_BUF_SIZE));
 
   }
-
 
   switch(src->errorsSortingType){
     case ERRORS_SORTING_TYPE_TIME:
@@ -122,24 +115,19 @@ void add_error_to_ERB(ErrorsHandler *src, InputErrorEx *inpError){
     break;
   }
 
-  int aa;
-  aa=0;
-
-
-
 }
 
 //id == 0   = invalid id
 InputErrorEx *get_error_in_ERB_at_id(ErrorsHandler *src, __uint64_t id){
-    int sz=src->ERBlen;
-    int index,i;
-    if(id==0)return NULL;
-    for(i=src->ERBbegin;i<src->ERBbegin+src->ERBlen;i++){
-        index=i % ERRORS_RING_BUF_SIZE;
-        if(src->ErrorsRingBuf[index].id==id)return &src->ErrorsRingBuf[index];
 
-    }
-    return NULL;
+  int sz=src->ERBlen;
+  int index,i;
+  if(id==0)return NULL;
+  for(i=src->ERBbegin;i<src->ERBbegin+src->ERBlen;i++){
+    index=i % ERRORS_RING_BUF_SIZE;
+    if(src->ErrorsRingBuf[index].id==id)return &src->ErrorsRingBuf[index];
+  }
+  return NULL;
 
 }
 
@@ -153,44 +141,24 @@ int get_ERB_errors_count(ErrorsHandler *src){
 InputErrorEx *get_error_from_ERB(ErrorsHandler *src, int num){
 
   if(num<0 || num>=src->ERBlen)return NULL;
-
   int index;
-
   index=(src->ERBbegin+num) % ERRORS_RING_BUF_SIZE;
-
   return &src->ErrorsRingBuf[index];
 
 }
 
-//redraw_content_flag
 void errors_handler_redraw_content(ErrorsHandler *src){
     src->redraw_content_flag=1;
 }
-
-
 
 void errors_handler_set_sorting(ErrorsHandler *src, int _sort){
 
     src->errorsSortingType=ERRORS_SORTING_TYPE_TIME;
     if(_sort==0)src->errorsSortingType=ERRORS_SORTING_TYPE_TIME;
     if(_sort==1)src->errorsSortingType=ERRORS_SORTING_TYPE_PRIORITY;
-
     src->sorting_changed_flag=1;
-/*
-    int i,sz;
-
-    sz=gldraw_get_history_errors_full_size(gldrw_src);
-
-    for(i=0;i<sz;i++){
-      gldrw_src->history_textlines[i].displayedErrorData.flag_show_this=0;
-    }
-    src->errors_added_num=sz-1;
-    if(src->errors_added_num<0)src->errors_added_num=0;
-    if(src->errors_added_num>src->ERBlen)src->errors_added_num=src->ERBlen;
-*/
 
 }
-
 
 void errors_handler_first_init(ErrorsHandler *src){
 
@@ -203,15 +171,11 @@ void errors_handler_first_init(ErrorsHandler *src){
   src->SortedErrorsArr_size=0;
   src->errors_in_history_num=0;
   src->errorsSortingType=ERRORS_SORTING_TYPE_TIME;
-  //src->errorsSortingType=ERRORS_SORTING_TYPE_PRIORITY;
   memset(&src->past_first_error,0,sizeof(InputErrorEx));
   src->animation_move_down_flag=0;
   src->global_id=0;//0=not valid
-
   src->sorting_changed_flag=0;
   src->redraw_content_flag=0;
-
-  //g_mutex_init(&src->add_error_lock);
 
 }
 
@@ -221,9 +185,6 @@ void errors_handler_set_pipeline_clock(ErrorsHandler *src, GstClock *_pipeline_c
 
 }
 
-
-
-
 int is_error_continuous(ErrorsHandler *src, InputErrorEx *_ie, __uint64_t cur_time){
 
   if(_ie->ie.timestamp+_ie->ie.delta_lasting > cur_time)return 1;
@@ -232,35 +193,9 @@ int is_error_continuous(ErrorsHandler *src, InputErrorEx *_ie, __uint64_t cur_ti
 }
 
 
-
-
 //return 1 if run history animation must move down
 //else return 0
 int sortErrors_byTime(ErrorsHandler *src){
-/*
-  InputErrorEx *ie;
-  int i,sz,sorted;
-
-  sz=get_ERB_errors_count(src);
-  src->SortedErrorsArr_size=sz;
-  for(i=0;i<sz;i++){
-    src->SortedErrorsArr[i]=get_error_from_ERB(src,i);
-  }
-
-  sorted=0;
-  while(!sorted){
-    sorted=1;
-    for(i=0;i<sz-1;i++){
-      if(src->SortedErrorsArr[i+1]->ie.timestamp < src->SortedErrorsArr[i]->ie.timestamp){
-        ie=src->SortedErrorsArr[i+1];
-        src->SortedErrorsArr[i+1]=src->SortedErrorsArr[i];
-        src->SortedErrorsArr[i]=ie;
-        sorted=0;
-      }
-    }
-  }
-*/
-
 
   InputErrorEx *ie;
   int i,sz;
@@ -340,14 +275,8 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
                                                              DisplayedErrorData *big_text_rect,
                                                              DisplayedErrorData *flash_rect){
 
-
-
-
   ErrorsHandler *src=(ErrorsHandler *)error_draw_callback_receiver;
   GlDrawing *gldr=(GlDrawing *)sender;
-
-  //g_mutex_lock(&src->add_error_lock);
-
 
   int sz,i,index;
   InputErrorEx *iex;
@@ -358,14 +287,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
   if(GST_IS_CLOCK(src->pipeline_clock)){
     current_time=gst_clock_get_time(src->pipeline_clock);
   }
-
-
-
-  //big_text_rect->pipeline_clock=src->pipeline_clock;
-  //flash_rect->pipeline_clock=src->pipeline_clock;
-  //for(i=0;i<gldraw_get_history_errors_full_size(gldr);i++){
-    //history[i]->pipeline_clock=src->pipeline_clock;
-  //}
 
   if(src->sorting_changed_flag==1){
 
@@ -384,7 +305,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
 
     for(i=0;i<sz;i++){
       history[i]->id=src->SortedErrorsArr[i]->id;
-      //history[i]->pipeline_clock=src->pipeline_clock;
       history[i]->flag_allow_rect_blink=0;
       history[i]->flag_show_msg=1;
       history[i]->flag_show_this=1;
@@ -413,11 +333,9 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
       break;
     }
 
-
     sz=MIN(history_size,src->SortedErrorsArr_size);
     for(i=0;i<sz;i++){
       history[i]->id=src->SortedErrorsArr[i]->id;
-      //history[i]->pipeline_clock=src->pipeline_clock;
       history[i]->flag_allow_rect_blink=0;
       history[i]->flag_show_msg=1;
       history[i]->flag_show_this=1;
@@ -436,12 +354,7 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
     if(src->errors_in_history_num>history_size)src->errors_in_history_num=history_size;
     return;
 
-
   }
-
-
-
-  //get_error_in_ERB_at_id
 
   switch(src->errorsSortingType){
     case ERRORS_SORTING_TYPE_TIME:
@@ -458,9 +371,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
               if(iex==NULL)iex=src->SortedErrorsArr[0];
 
               big_text_rect->id=iex->id;
-              //big_text_rect->flag_is_continuous=is_error_continuous(src,src->SortedErrorsArr[0],current_time);
-              //big_text_rect->delta_lasting=src->SortedErrorsArr[0]->delta_lasting;
-              //big_text_rect->timestamp=src->SortedErrorsArr[0]->timestamp;
               big_text_rect->flag_allow_rect_blink=0;
               big_text_rect->flag_show_msg=1;
               big_text_rect->flag_show_this=1;
@@ -480,10 +390,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
             }
            }
 
-
-
-
-
           break;
           case ERROR_DRAW_CALLBACK_EVENT_LIST_MOVE_END:
 
@@ -502,9 +408,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
             if(index<src->SortedErrorsArr_size){
 
               history[0]->id=src->SortedErrorsArr[index]->id;
-              //history[0]->flag_is_continuous=is_error_continuous(src,src->SortedErrorsArr[index],current_time);
-              //history[0]->delta_lasting=src->SortedErrorsArr[index]->delta_lasting;
-              //history[0]->timestamp=src->SortedErrorsArr[index]->timestamp;
               history[0]->flag_allow_rect_blink=0;
               history[0]->flag_show_msg=1;
               history[0]->flag_show_this=1;
@@ -547,9 +450,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
               if(iex==NULL)iex=src->SortedErrorsArr[0];
 
               big_text_rect->id=iex->id;
-              //big_text_rect->flag_is_continuous=is_error_continuous(src,src->SortedErrorsArr[0],current_time);
-              //big_text_rect->delta_lasting=src->SortedErrorsArr[0]->delta_lasting;
-              //big_text_rect->timestamp=src->SortedErrorsArr[0]->timestamp;
               big_text_rect->flag_allow_rect_blink=0;
               big_text_rect->flag_show_msg=1;
               big_text_rect->flag_show_this=1;
@@ -575,49 +475,13 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
 
             if(src->errors_added_num>0){
 
+              src->errors_in_history_num=history_size;
 
-            src->errors_in_history_num=history_size;
-/*
-            if(src->animation_move_down_flag==1){
-
-              for(i=src->errors_in_history_num-1;i>0;i--){
-                *history[i]=*history[i-1];
-              }
-
-              index=src->errors_added_num-1;
-
-              if(index<src->SortedErrorsArr_size){
-
-                history[0]->id=src->SortedErrorsArr[index]->id;
-                //history[0]->flag_is_continuous=is_error_continuous(src,src->SortedErrorsArr[index],current_time);
-                //history[0]->delta_lasting=src->SortedErrorsArr[index]->delta_lasting;
-                //history[0]->timestamp=src->SortedErrorsArr[index]->timestamp;
-                history[0]->flag_allow_rect_blink=0;
-                history[0]->flag_show_msg=1;
-                history[0]->flag_show_this=1;
-                history[0]->flag_show_time=1;
-                strcpy(history[0]->msg,src->SortedErrorsArr[index]->ie.msg);
-                history[0]->severity=src->SortedErrorsArr[index]->ie.severity;
-                history[0]->creation_time_d=src->SortedErrorsArr[index]->creation_time_d;
-                history[0]->creation_time_h=src->SortedErrorsArr[index]->creation_time_h;
-                history[0]->creation_time_m=src->SortedErrorsArr[index]->creation_time_m;
-                history[0]->creation_time_s=src->SortedErrorsArr[index]->creation_time_s;
-
-              }
-
-              gldraw_move_history_textlines_shift_y_only_one_frame(gldr);
-
-            }else{
-*/
               sz=MIN(src->errors_in_history_num,src->SortedErrorsArr_size);
 
               for(i=0;i<sz;i++){
 
                 history[i]->id=src->SortedErrorsArr[i]->id;
-                //history[i]->pipeline_clock=src->pipeline_clock;
-                //history[i]->flag_is_continuous=is_error_continuous(src,src->SortedErrorsArr[i],current_time);
-                //history[i]->delta_lasting=src->SortedErrorsArr[i]->delta_lasting;
-                //history[i]->timestamp=src->SortedErrorsArr[i]->timestamp;
                 history[i]->flag_allow_rect_blink=0;
                 history[i]->flag_show_msg=1;
                 history[i]->flag_show_this=1;
@@ -631,14 +495,10 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
 
               }
 
-//            }
-
-            src->errors_added_num--;
-            if(src->errors_added_num<0){
-              src->errors_added_num=0;
-            }
-
-
+              src->errors_added_num--;
+              if(src->errors_added_num<0){
+                src->errors_added_num=0;
+              }
 
            }
 
@@ -651,10 +511,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
     default:
     break;
   }
-
-
-
-
 
   iex=get_error_in_ERB_at_id(src,big_text_rect->id);
   if(iex!=NULL){
@@ -670,8 +526,6 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
     flash_rect->flag_is_continuous=is_error_continuous(src,iex,current_time);
   }
 
-
-
   for(i=0;i<gldraw_get_history_errors_full_size(gldr);i++){
     iex=get_error_in_ERB_at_id(src,history[i]->id);
     if(iex!=NULL){
@@ -681,27 +535,11 @@ void errors_handler_draw_callback(void *error_draw_callback_receiver, void *send
     }
   }
 
-
-  int a;
-  a=0;
-
-  //g_mutex_unlock(&src->add_error_lock);
-
-
 }
-
-
 
 void errors_handler_add_errors(ErrorsHandler *src, InputError *inpErrors, int inpErrorsNum){
 
-
-  //g_mutex_lock(&src->add_error_lock);
-
   int i;
-
-  //src->errors_added_num+=inpErrorsNum;
-
-  //src->errors_added_num=CLAMP(src->errors_added_num,0,MAX(0,ERRORS_RING_BUF_SIZE-history_errors_full_size));
 
   InputError ie;
   int sorted=0;
@@ -736,14 +574,6 @@ void errors_handler_add_errors(ErrorsHandler *src, InputError *inpErrors, int in
     add_error_to_ERB(src,&iex);
 
   }
-
-
-
-  //ERB_to_remove_duplications_array(src);
-
-  i=0;
-
-  //g_mutex_unlock(&src->add_error_lock);
 
 }
 

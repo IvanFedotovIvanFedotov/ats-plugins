@@ -1,7 +1,4 @@
 /*
-
-gst-launch-1.0 gldisplayerrors set-errors=0x07 ! glimagesink
-
  * Copyright (C) <1999> Erik Walthinsen <omega@cse.ogi.edu>
  * Copyright (C) 2002,2007 David A. Schleef <ds@schleef.org>
  * Copyright (C) 2008 Julien Isorce <julien.isorce@gmail.com>
@@ -23,6 +20,11 @@ gst-launch-1.0 gldisplayerrors set-errors=0x07 ! glimagesink
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  *
+ * Nuklear - 1.40.8 - public domain
+ * no warrenty implied; use at your own risk.
+ * authored from 2015-2017 by Micha Mettke
+ * emscripten from 2016 by Chris Willcocks
+ * OpenGL ES 2.0 from 2017 by Dmitry Hrabrov a.k.a. DeXPeriX
  */
 
 #include <gst/gst.h>
@@ -32,17 +34,6 @@ gst-launch-1.0 gldisplayerrors set-errors=0x07 ! glimagesink
 #include <math.h>
 
 #include <fontconfig/fontconfig.h>
-
-#include <stdio.h>
-
-
-
-//gst-launch-1.0 gldisplayerrors set_errors=0x05 ! glimagesink
-
-
-//--------------------
-
-//#include <GL/gl.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,14 +61,6 @@ gst-launch-1.0 gldisplayerrors set-errors=0x07 ! glimagesink
 
 #define UNUSED(a) (void)a
 #define LEN(a) (sizeof(a)/sizeof(a)[0])
-
-/*
- * Nuklear - 1.40.8 - public domain
- * no warrenty implied; use at your own risk.
- * authored from 2015-2017 by Micha Mettke
- * emscripten from 2016 by Chris Willcocks
- * OpenGL ES 2.0 from 2017 by Dmitry Hrabrov a.k.a. DeXPeriX
- */
 
 #include <string.h>
 #include <time.h>
@@ -114,7 +97,7 @@ static struct nk_custom {
     int vertices[MAX_VERTEX_MEMORY];
     int elements[MAX_ELEMENT_MEMORY];
 
-};// sdl;
+};
 
 #define NK_SHADER_VERSION "#version 150\n"
 
@@ -131,7 +114,6 @@ static const GLfloat positions2[] = {
      -1.0, -1.0
 };
 
-//----------------
 
 void gldraw_clear_set_pipeline_clock(GlDrawing *src, GstClock *_pipeline_clock){
   src->pipeline_clock=_pipeline_clock;
@@ -149,33 +131,11 @@ int gldraw_get_history_errors_full_size(GlDrawing *src){
 
 }
 
-
-
 void gldraw_set_history_errors_window_size(GlDrawing *src, int value){
+
   if(value<1)value=1;
   if(value>history_errors_full_max_size-1)value=history_errors_full_max_size-1;
   src->history_errors_window_size=value;
-
-}
-
-
-
-void gldraw_set_bg_color(GlDrawing *src, unsigned int color){
-
-  src->color_background[0]=(float)((color & 0xff000000)>>24);
-  src->color_background[1]=(float)((color & 0x00ff0000)>>16);
-  src->color_background[2]=(float)((color & 0x0000ff00)>>8);
-  src->color_background[3]=(float)((color & 0x000000ff));
-
-
-}
-
-unsigned int gldraw_get_bg_color(GlDrawing *src){
-
-  return (((unsigned int)src->color_background[0]))<<24 |
-         (((unsigned int)src->color_background[1]))<<16 |
-         (((unsigned int)src->color_background[2]))<<8  |
-         (((unsigned int)src->color_background[3]));
 
 }
 
@@ -243,9 +203,17 @@ static const GLchar *fragment_shader =
         "uniform sampler2D Texture;\n"
         "varying vec2 Frag_UV;\n"
         "varying vec4 Frag_Color;\n"
+        "uniform int bg_fill_flag;"
+        "uniform vec4 bg_color;"
+
         "void main(){\n"
         //"   gl_FragColor=vec4(1.0,0.5,0.0,1.0)+Frag_Color;"
+        " if(bg_fill_flag==0){"
         "   gl_FragColor = Frag_Color * texture2D(Texture, Frag_UV);\n"
+        " }else{"
+        "   gl_FragColor = bg_color;\n"
+        //"   gl_FragColor = vec4(0.0,0.0,0.0,0.0);\n"
+        " }"
         "}\n";
 
 
@@ -253,12 +221,12 @@ static const GLchar *fragment_shader =
 ErrorProperties errors_properties[SEVERITY_COUNT]=
 {
 
-    0.0,0.0,0.0,255,  0.0,255,0.0,255,  255,255,0,160,
-    0.0,0.0,0.0,255,  255,255,0.0,255,  255,255,100,160,
-    0.0,0.0,0.0,255,  255,200,0.0,255,  255,255,100,160,
-    0.0,0.0,0.0,255,  255,160,0.0,255,  255,200,100,160,
-    0.0,0.0,0.0,255,  255,100,0.0,255,  255,150,100,160,
-    0.0,0.0,0.0,255,  255,0.0,0.0,255,  255,100,100,160
+    0.0,0.0,0.0,255,  0.0,255,0.0,255,  255,255,0,230,
+    0.0,0.0,0.0,255,  255,255,0.0,255,  255,255,100,230,
+    0.0,0.0,0.0,255,  255,200,0.0,255,  255,255,100,230,
+    0.0,0.0,0.0,255,  255,160,0.0,255,  255,200,100,230,
+    0.0,0.0,0.0,255,  255,100,0.0,255,  255,150,100,230,
+    0.0,0.0,0.0,255,  255,0.0,0.0,255,  255,100,100,230
 
 };
 
@@ -349,14 +317,19 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
 }
 
 
+float calc_bigtextline_ly(GlDrawing *src){
+  return src->all_text_lines_ly_percent*((float)src->height)*0.3;
+}
+
 
 float calc_history_one_line_ly(GlDrawing *src){
-  return ((float)src->history_textlines_ly)/((float)src->history_errors_window_size);
+  //return ((float)src->history_textlines_ly)/((float)src->history_errors_window_size);
+
+  if(src->history_errors_window_size==0)return 0;
+  return (src->all_text_lines_ly_percent*(float)src->height-calc_bigtextline_ly(src))/((float)src->history_errors_window_size);
+
 }
 
-float calc_bigtextline_ly(GlDrawing *src){
-  return 0.25*((float)src->height);
-}
 
 float move_history_textlines_shift_y_one_frame(GlDrawing *src){
 
@@ -406,7 +379,7 @@ void calc_one_line(GstClock *pipeline_clock,
       text_line->border_lx=text_line->lx;//-text_line->border_thick;
       text_line->border_ly=text_line->ly;//-text_line->border_thick;
 
-      text_line->border_blink_flag=0;
+      //text_line->border_blink_flag=0;
 
       //text_line->time_text_visible=time_text_visible;
 
@@ -456,49 +429,6 @@ void calc_one_line(GstClock *pipeline_clock,
 
 
 
-      len=strlen(text_line->displayedErrorData.msg);
-      max_text_len_pixels=text_line->text_lx;
-
-      for(i=0;i<text_line->fonts_ptrs_num;i++){
-
-         len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[i],
-                                                  text_line->displayedErrorData.msg,
-                                                  max_text_len_pixels-10);
-         text_line->fonts_ptr_selected=i;
-         if(len==len_cut){
-           break;
-         }
-      }
-
-
-      if(len>0 && len<text_line_size){
-
-         //len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[text_line->fonts_ptr_selected],
-         //                                         text_line->displayedErrorData.msg,
-         //                                         max_text_len_pixels);
-
-
-
-         if(len_cut>0){
-
-           memcpy(text_line->text_line,
-                text_line->displayedErrorData.msg,
-                len_cut);
-
-           if(len!=len_cut){
-             text_line->text_line[len_cut]=':';
-           }
-
-           text_line->text_line[len_cut+1]=0;
-
-         }else{
-           text_line->text_line[0]=0;
-         }
-
-
-         //text_line->text_line[len_cut+1]=0;
-
-      }
 
 
 
@@ -506,8 +436,13 @@ void calc_one_line(GstClock *pipeline_clock,
       if(_fonts_ptrs!=NULL)text_line->text_ly=_fonts_ptrs[text_line->fonts_ptr_selected]->info.height;
       text_line->text_x=text_line->x+text_x_caption_begin_percent*text_line->lx;
       text_line->text_y=text_line->y+text_line->ly/2.0-text_line->text_ly/2.0;//text_line->y+text_y-text_line->border_thick/2.0;
-      text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
-
+/*
+      if(text_line->displayedErrorData.flag_is_continuous==1){
+        text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
+      }else{
+        text_line->text_lx=text_x_time_end_percent*text_line->lx-text_line->x;
+      }
+*/
 
 
       double showed_time;
@@ -540,18 +475,121 @@ void calc_one_line(GstClock *pipeline_clock,
 
         s=val;
 
-        sprintf(text_line->text_time,"%02d:%02d:%02d:%02d",d,h,m,s);
+        if(d>0){
+          sprintf(text_line->text_time,"%02dD:%02dH:%02dm:%02ds",d,h,m,s);
+        }else
+        if(h>0){
+          sprintf(text_line->text_time,"%02dH:%02dm:%02ds",h,m,s);
+        }else
+        if(m>0){
+          sprintf(text_line->text_time,"%02dm:%02ds",m,s);
+        }else
+        if(s>=0){
+          sprintf(text_line->text_time,"%02ds",s);
+        }
+
+
+
 
 
       }else{
+        sprintf(text_line->text_time,"\0");
 
+/*
         sprintf(text_line->text_time,"%02d:%02d:%02d:%02d",
                 text_line->displayedErrorData.creation_time_d,
                 text_line->displayedErrorData.creation_time_h,
                 text_line->displayedErrorData.creation_time_m,
                 text_line->displayedErrorData.creation_time_s);
+*/
+      }
+/*
+      if(text_line->displayedErrorData.flag_is_continuous==1){
+        if(strcmp(text_line->text_time,"00s")!=0){
+          int aaa;
+          aaa=0;
+        }
+      }
+*/
+
+      //if(text_line->displayedErrorData.flag_is_continuous==1){
+      //  text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
+      //}else{
+      int len_pix;
+      char buf1[100];
+      nk_handle handle1;
+      handle1.ptr=text_line->font_time_text_ptr;
+      if(text_line->displayedErrorData.flag_is_continuous==1){
+        sprintf(buf1,"___%s\0",text_line->text_time);
+      }else{
+        buf1[0]='\0';
+        //if(text_line->text_line[0]=='2'){
+        //    int aa;
+        //    aa=0;
+        //}
 
       }
+
+      len_pix=nk_font_text_width(handle1,text_line->font_time_text_ptr->info.height,buf1,strlen(buf1));
+      text_line->text_lx=text_x_time_end_percent*text_line->lx-text_line->x-len_pix;
+      //}
+
+
+
+      len=strlen(text_line->displayedErrorData.msg);
+      max_text_len_pixels=text_line->text_lx;
+
+      for(i=0;i<text_line->fonts_ptrs_num;i++){
+
+         len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[i],
+                                                  text_line->displayedErrorData.msg,
+                                                  max_text_len_pixels-10);
+         text_line->fonts_ptr_selected=i;
+         if(len==len_cut){
+           break;
+         }
+      }
+
+
+
+
+      if(len>0 && len<text_line_size){
+
+         //len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[text_line->fonts_ptr_selected],
+         //                                         text_line->displayedErrorData.msg,
+         //                                         max_text_len_pixels);
+
+
+
+         if(len_cut>0){
+
+           memcpy(text_line->text_line,
+                text_line->displayedErrorData.msg,
+                len_cut);
+
+           if(len!=len_cut){
+             text_line->text_line[len_cut]='.';
+             text_line->text_line[len_cut+1]='.';
+             text_line->text_line[len_cut+2]='.';
+             text_line->text_line[len_cut+3]=0;
+           }else{
+             text_line->text_line[len_cut]=0;
+           }
+
+         }else{
+           text_line->text_line[0]=0;
+         }
+
+
+         //text_line->text_line[len_cut+1]=0;
+
+      }
+
+
+
+
+
+
 
       if(_fonts_ptrs!=NULL)text_line->text_time_ly=text_line->font_time_text_ptr->info.height;
       text_line->text_time_x=text_line->x+text_x_time_begin_percent*text_line->lx;
@@ -559,7 +597,7 @@ void calc_one_line(GstClock *pipeline_clock,
       text_line->text_time_x_zone_begin=text_line->x+text_x_time_begin_percent*text_line->lx;
       text_line->text_time_x_zone_end=text_line->x+text_x_time_end_percent*text_line->lx;
       //text_line->text_time_lx=text_line->text_time_x_zone_end-text_line->text_time_x_zone_begin;
-      nk_handle handle1;
+
       handle1.ptr=_font_time_text_ptr;
       text_line->text_time_lx=nk_font_text_width(handle1,_font_time_text_ptr->info.height,text_line->text_time,strlen(text_line->text_time));
 
@@ -581,10 +619,11 @@ void calc_all_draw_sizes(GlDrawing *src){
 
 
 
-  x=0.05*src->width;
-  y=src->history_textlines_y;
+  x=0.03*src->width;
+  //y=src->history_textlines_y;
+  y=floor(src->all_text_lines_begin_y_percent*((float)src->height)+calc_bigtextline_ly(src));
   lx=src->width-x*2;
-  ly=calc_history_one_line_ly(src);
+  ly=floor(calc_history_one_line_ly(src));
 
   struct nk_font *input_fonts[SELECTED_FONT_PTRS_NUM];
 
@@ -599,35 +638,35 @@ void calc_all_draw_sizes(GlDrawing *src){
                     0.05, 0.68,
                     0.77, 0.95,
                     ly/2-src->font_small_text_line->info.height/2,
-                    src->height/150.0,
+                    3.0,
                     src->color_text);
 
 
       y=y+ly;
 
-      if(y+src->history_textlines_shift_y>src->history_textlines_y+src->history_textlines_ly+0.01){
+
+      if(y+src->history_textlines_shift_y>src->all_text_lines_begin_y_percent*((float)src->height)+calc_bigtextline_ly(src)+calc_history_one_line_ly(src)*((float)src->history_errors_window_size)+0.01){
          src->history_textlines[i].displayedErrorData.flag_show_this=0;
       }
 
   }
 
-  x=0.05*src->width;
+  x=0.03*src->width;
   lx=src->width-x*2;
-  ly=calc_bigtextline_ly(src);
-  y=src->history_textlines_y-ly;
+  y=floor(src->all_text_lines_begin_y_percent*((float)src->height));
+  ly=floor(calc_bigtextline_ly(src));
+  //y=src->history_textlines_y-ly;
 
   input_fonts[0]=src->font_big_text_line;
-  input_fonts[1]=src->font_medium_text_line;
-  input_fonts[2]=src->font_small_text_line;
   calc_one_line(src->pipeline_clock,
                 &src->big_textline,
                 x, y, lx, ly,
-                input_fonts,3,
-                src->font_medium_text_line,
+                input_fonts,1,
+                src->font_small_text_line,
                 0.05, 0.68,
                 0.77, 0.95,
                 ly/2-src->font_big_text_line->info.height/2,
-                src->height/120.0,
+                3.0,
                 src->color_text);
 
 
@@ -639,7 +678,7 @@ void calc_all_draw_sizes(GlDrawing *src){
                 0, 0,
                 0, 0,
                 0,
-                src->height/90.0,
+                5.0,
                 src->color_text);
 
 
@@ -735,7 +774,7 @@ void gldraw_first_init(GlDrawing *src){
   src->font_big_text_line=NULL;
 
   //argb
-  src->color_background[0]=128;
+  src->color_background[0]=0;
   src->color_background[1]=255;
   src->color_background[2]=255;
   src->color_background[3]=255;
@@ -745,6 +784,9 @@ void gldraw_first_init(GlDrawing *src){
   src->color_text[2]=0;
   src->color_text[3]=0;
 
+
+  src->all_text_lines_begin_y_percent=0.05;
+  src->all_text_lines_ly_percent=0.9;
 
 
   src->history_textlines_shift_y=0;
@@ -822,8 +864,8 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
     src->height=height;
     src->fps=fps;
 
-    src->history_textlines_y=0.37*src->height;
-    src->history_textlines_ly=0.5*src->height;
+    //src->history_textlines_y=0.37*src->height;
+    //src->history_textlines_ly=0.5*src->height;
 
     src->history_textlines_shift_y=0;
 
@@ -928,20 +970,20 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 
 
 
-
-    font_size=calc_bigtextline_ly(src)/2.0;//*w/h*3.0/4.0;
-    if(h*1.2>w)font_size*=w/h*3.0/4.0;
-    if(font_size<5)font_size=5;
+    font_size=font_size*1.5;
+    //font_size=calc_bigtextline_ly(src)/2.0;//*w/h*3.0/4.0;
+    //if(h*1.2>w)font_size*=w/h*3.0/4.0;
+    //if(font_size<5)font_size=5;
     src->font_big_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
                               src->font_full_filename,
                               font_size, &conf);
 
-
+/*
     font_size/=1.7;
     src->font_medium_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
                               src->font_full_filename,
                               font_size, &conf);
-
+*/
 
 
 
@@ -986,6 +1028,19 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
      gldraw_set_error_codes(src,0x01|0x02);
 */
 
+
+
+     glGenTextures(1, &src->dummy_texture);
+
+     glBindTexture(GL_TEXTURE_2D, src->dummy_texture);
+
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+
+     glBindTexture(GL_TEXTURE_2D, 0);
 
      src->gl_drawing_created=1;
 
@@ -1085,8 +1140,6 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     if(src->font_full_filename[0]==0)return FALSE;
 
 
-
-
     fire_error_draw_callback(src, ERROR_DRAW_CALLBACK_EVENT_BEGIN_FRAME);
 
     if(src->history_textlines_shift_y>=0)fire_error_draw_callback(src, ERROR_DRAW_CALLBACK_EVENT_LIST_MOVE_END);
@@ -1094,6 +1147,112 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
     calc_all_draw_sizes(src);
     move_history_textlines_shift_y_one_frame(src);
+
+
+//------------------- очистка фона прозрачностью
+
+
+    GLfloat ortho[4][4] = {
+        {2.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f,-2.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f,-1.0f, 0.0f},
+        {-1.0f,1.0f, 0.0f, 1.0f},
+    };
+
+    GLfloat positions[32];
+
+    positions[0]=0.0;
+    positions[1]=0.0;
+    positions[2]=0.0;
+    positions[3]=0.0;
+    positions[4]=src->color_background[1];
+    positions[5]=src->color_background[2];
+    positions[6]=src->color_background[3];
+    positions[7]=src->color_background[0];
+    positions[8]=src->width;
+    positions[9]=0.0;
+    positions[10]=1.0;
+    positions[11]=0.0;
+    positions[12]=src->color_background[1];
+    positions[13]=src->color_background[2];
+    positions[14]=src->color_background[3];
+    positions[15]=src->color_background[0];
+    positions[16]=src->width;
+    positions[17]=src->height;
+    positions[18]=1.0;
+    positions[19]=1.0;
+    positions[20]=src->color_background[1];
+    positions[21]=src->color_background[2];
+    positions[22]=src->color_background[3];
+    positions[23]=src->color_background[0];
+    positions[24]=0.0;
+    positions[25]=src->height;
+    positions[26]=0.0;
+    positions[27]=1.0;
+    positions[28]=src->color_background[1];
+    positions[29]=src->color_background[2];
+    positions[30]=src->color_background[3];
+    positions[31]=src->color_background[0];
+
+    GLushort indices_quad[] = { 0, 1, 2, 0, 2, 3 };
+
+     //[[[[[[[[[[[[[
+
+    ortho[0][0] /= (GLfloat)src->width;
+    ortho[1][1] /= (GLfloat)src->height;
+
+    glDisable(GL_BLEND);
+    //glEnable(GL_BLEND);
+    //glBlendEquation(GL_FUNC_ADD);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    //glEnable(GL_SCISSOR_TEST);
+    glActiveTexture(GL_TEXTURE0);
+
+    if(gl->GenVertexArrays){
+      gl->BindVertexArray (src->all_context_nk->ogl.vao);
+    }
+
+    gl->BindBuffer (GL_ARRAY_BUFFER, src->all_context_nk->ogl.vbo);
+    gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, src->all_context_nk->ogl.ebo);
+
+    gst_gl_shader_use (src->shader);
+
+    glEnableVertexAttribArray (src->all_context_nk->ogl.attrib_pos);
+    glEnableVertexAttribArray (src->all_context_nk->ogl.attrib_uv);
+    glEnableVertexAttribArray (src->all_context_nk->ogl.attrib_col);
+    glVertexAttribPointer (src->all_context_nk->ogl.attrib_pos, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void *)0);
+    glVertexAttribPointer (src->all_context_nk->ogl.attrib_uv, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void *)(2*sizeof(float)));
+    glVertexAttribPointer (src->all_context_nk->ogl.attrib_col, 4, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void *)(4*sizeof(float)));
+
+
+    glBindTexture(GL_TEXTURE_2D, src->dummy_texture);
+
+    gst_gl_shader_set_uniform_1f(src->shader, "height", src->height);
+    gst_gl_shader_set_uniform_1i(src->shader, "Texture", 0);
+    gst_gl_shader_set_uniform_matrix_4fv(src->shader, "ProjMtx", 1, FALSE, &ortho[0][0]);
+    gst_gl_shader_set_uniform_1i(src->shader, "bg_fill_flag", 1);
+    gst_gl_shader_set_uniform_4f(src->shader, "bg_color",src->color_background[1],src->color_background[2],src->color_background[3],src->color_background[0]);
+
+
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_STATIC_DRAW);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
+
+
+    gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
+    gl->BindBuffer (GL_ARRAY_BUFFER, 0);
+    gl->DisableVertexAttribArray (src->all_context_nk->ogl.attrib_pos);
+    gl->BindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    gst_gl_context_clear_shader(context);
+
+    glDisable(GL_BLEND);
+
+//-----------------------
 
 
     nk_buffer_init_default(&src->all_context_nk->ogl.cmds);
@@ -1154,8 +1313,8 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         //nk_layout_row_static(&src->all_context_nk->ctx, src->height, src->width, 1);
 
 
-        nk_fill_rect(commands, nk_rect(0,0,src->width,src->height), 0,
-                     nk_rgba(src->color_background[1], src->color_background[2], src->color_background[3], src->color_background[0]));
+        //nk_fill_rect(commands, nk_rect(src->big_textline.x,src->big_textline.y,src->big_textline.lx,src->all_text_lines_ly_percent*((float)src->height)), 0,
+        //             nk_rgba(src->color_background[1]+100, src->color_background[2]-100, src->color_background[3], src->color_background[0]));
 
 
 
@@ -1171,6 +1330,14 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
 
         tr=&src->big_flash_rect;
+        /*nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick, nk_rgba(
+                                                                      src->color_background[1]+100,
+                                                                      src->color_background[2]-100,
+                                                                      src->color_background[3],
+                                                                      src->color_background[0]
+                                                                                             ));
+                                                                                             */
+
         if(tr->displayedErrorData.flag_show_this==1){
           if(tr->displayedErrorData.flag_allow_rect_blink==1 && tr->displayedErrorData.flag_is_continuous==1){
             if(blink_flag==1){
@@ -1191,16 +1358,26 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         }
 
 
-
-
-        nk_layout_row_static(&src->all_context_nk->ctx, src->history_textlines_y, src->width, 1);
+        nk_layout_row_static(&src->all_context_nk->ctx,
+                             floor(src->all_text_lines_begin_y_percent*((float)src->height)+calc_bigtextline_ly(src)),
+                             src->width, 1);
         //nk_layout_row_static(&src->all_context_nk->ctx, 0, src->width, 1);
 
         if (nk_group_begin(&src->all_context_nk->ctx, "Group0", NK_WINDOW_NO_SCROLLBAR)) {
 
 
 
-           tr=&src->big_textline;
+            tr=&src->big_textline;
+/*
+            nk_fill_rect(commands, nk_rect(tr->x,tr->y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(
+                                                                      src->color_background[1]+100,
+                                                                      src->color_background[2]-100,
+                                                                      src->color_background[3],
+                                                                      src->color_background[0]
+                                                                                             ));
+*/
+
+
             if(tr->displayedErrorData.flag_show_this==1){
                 if(tr->background_enabled_flag==1)
                   nk_fill_rect(commands, nk_rect(tr->x,tr->y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
@@ -1226,7 +1403,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                        tr->text_color[3]));
 
 
-                if(tr->displayedErrorData.flag_show_time==1){
+                if(tr->displayedErrorData.flag_show_time==1 && tr->displayedErrorData.flag_is_continuous==1){
                      //nk_draw_text(commands, nk_rect(tr->text_time_x,tr->text_time_y,tr->text_time_lx,tr->text_time_ly),
                      nk_draw_text(commands, nk_rect(tr->text_time_x_zone_end-tr->text_time_lx,tr->text_time_y,tr->text_time_lx,tr->text_time_ly),
 
@@ -1243,17 +1420,16 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
 
 
-            }else{
-              int pp;
-              pp=0;
-
             }
 
            nk_group_end(&src->all_context_nk->ctx);
         }
 
-        nk_layout_row_static(&src->all_context_nk->ctx, src->history_textlines_ly, src->width, 1);
+        nk_layout_row_static(&src->all_context_nk->ctx,
+                             floor(src->history_textlines_shift_y+src->all_text_lines_ly_percent*((float)src->height)-calc_bigtextline_ly(src))-2,
+                             src->width, 1);
         //nk_layout_row_static(&src->all_context_nk->ctx, src->height, src->width, 1);
+
 
         if (nk_group_begin(&src->all_context_nk->ctx, "Group1", NK_WINDOW_NO_SCROLLBAR)) {
 
@@ -1261,9 +1437,21 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
 
 
+
             for(i=0;i<gldraw_get_history_errors_full_size(src);i++){
               tr=&src->history_textlines[i];
+
+
+
               if(tr->displayedErrorData.flag_show_this==1){
+/*
+                nk_fill_rect(commands, nk_rect(tr->x,tr->y-1+src->history_textlines_shift_y,tr->lx,tr->ly+2), 0, nk_rgba(
+                                                                      src->color_background[1]+100,
+                                                                      src->color_background[2]-100,
+                                                                      src->color_background[3],
+                                                                      src->color_background[0]
+                                                                                             ));
+*/
                   if(tr->background_enabled_flag==1)
                     nk_fill_rect(commands, nk_rect(tr->x,tr->y+src->history_textlines_shift_y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
                                                                                          tr->background_color[1],
@@ -1276,7 +1464,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                          tr->border_color[2],
                                          tr->border_color[3]));
 
-                  nk_draw_text(commands, nk_rect(tr->text_x,tr->text_y+src->history_textlines_shift_y,tr->text_lx,tr->text_ly),
+                  nk_draw_text(commands, nk_rect(tr->text_x,tr->text_y+src->history_textlines_shift_y,tr->text_lx+200,tr->text_ly),
                                tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle,//&src->font_small_text_line->handle,//src->all_context_nk->ctx.style.font,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
@@ -1287,8 +1475,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                        tr->text_color[2],
                                        tr->text_color[3]));
 
-
-                if(tr->displayedErrorData.flag_show_time==1){
+                if(tr->displayedErrorData.flag_show_time==1 &&
+                   tr->displayedErrorData.flag_is_continuous==1){
+                //if(tr->displayedErrorData.flag_show_time==1){
 
                   //nk_draw_text(commands, nk_rect(tr->text_time_x,tr->text_time_y+src->history_textlines_shift_y,tr->text_time_lx,tr->text_time_ly),
                   nk_draw_text(commands, nk_rect(tr->text_time_x_zone_end-tr->text_time_lx,tr->text_time_y+src->history_textlines_shift_y,tr->text_time_lx,tr->text_time_ly),
@@ -1320,7 +1509,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
 
     //struct nk_vec2 scale;
-
+/*
     GLfloat ortho[4][4] = {
         {2.0f, 0.0f, 0.0f, 0.0f},
         {0.0f,-2.0f, 0.0f, 0.0f},
@@ -1330,7 +1519,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
     ortho[0][0] /= (GLfloat)src->width;
     ortho[1][1] /= (GLfloat)src->height;
-
+*/
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1360,6 +1549,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     gst_gl_shader_set_uniform_1f(src->shader, "height", src->height);
     gst_gl_shader_set_uniform_1i(src->shader, "Texture", 0);
     gst_gl_shader_set_uniform_matrix_4fv(src->shader, "ProjMtx", 1, FALSE, &ortho[0][0]);
+    gst_gl_shader_set_uniform_1i(src->shader, "bg_fill_flag", 0);
+    gst_gl_shader_set_uniform_4f(src->shader, "bg_color",src->color_background[1],src->color_background[2],src->color_background[3],src->color_background[0]);
+
 
     const struct nk_draw_command *cmd;
     const nk_draw_index *offset = NULL;
@@ -1477,6 +1669,9 @@ void gldraw_close (GstGLContext * context, GlDrawing *src)
       nk_buffer_free(&src->all_context_nk->ogl.cmds);
 
       free(src->all_context_nk);
+
+      glDeleteTextures(1,&src->dummy_texture);
+
   }
   src->all_context_nk=NULL;
 
@@ -1485,6 +1680,8 @@ void gldraw_close (GstGLContext * context, GlDrawing *src)
       gst_object_unref(src->shader);
       src->shader=NULL;
   }
+
+
 
   src->gl_drawing_created=0;
 

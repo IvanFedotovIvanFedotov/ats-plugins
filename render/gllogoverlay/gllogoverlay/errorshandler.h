@@ -21,19 +21,8 @@
 #ifndef __ERRORSHANDLER_H__
 #define __ERRORSHANDLER_H__
 
-
-
 #include <stdio.h>
-
 #include "gldrawing.h"
-
-//gst_clock_get_time()
-//https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstClock.html#gst-clock-get-time
-
-
-
-
-
 
 
 typedef struct {
@@ -58,8 +47,6 @@ typedef struct {
 }InputErrorEx;
 
 
-
-
 enum {
 
  ERRORS_SORTING_TYPE_TIME=0,
@@ -67,11 +54,7 @@ enum {
 
 };
 
-
 #define ERRORS_RING_BUF_SIZE 15
-
-
-
 
 typedef struct{
 
@@ -85,14 +68,11 @@ typedef struct{
   __uint64_t capture_time_delta;
   __uint64_t capture_time_end;
 
-
   int sorting_changed_flag;
   int redraw_content_flag;
 
-
   InputErrorEx past_first_error;
   int animation_move_down_flag;
-
 
   //1. Все входные ошибки
   int ERBbegin;
@@ -107,32 +87,19 @@ typedef struct{
 
   int errors_in_history_num;
 
-  GMutex add_error_lock;
-
-
 }ErrorsHandler;
 
 
 void errors_handler_redraw_content(ErrorsHandler *src);
-
 void errors_handler_set_sorting(ErrorsHandler *src, int _sort);
-
 void errors_handler_clear(GlDrawing *gldrw_src, ErrorsHandler *src);
-
 void errors_handler_set_pipeline_clock(ErrorsHandler *src, GstClock *_pipeline_clock);
-
-
 void errors_handler_draw_callback(void *error_draw_callback_receiver, void *sender,
                                   int event_type, DisplayedErrorData **history, int history_size,
                                                              DisplayedErrorData *big_text_rect,
                                                              DisplayedErrorData *flash_rect);
-
 void errors_handler_first_init(ErrorsHandler *src);
-
 void errors_handler_add_errors(ErrorsHandler *src, InputError *inpErrors, int inpErrorsNum);
-
-
-
 
 #endif //__ERRORSHANDLER_H__
 

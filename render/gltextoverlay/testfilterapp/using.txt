@@ -1,2 +1,0 @@
-./testfilterapp test1
-

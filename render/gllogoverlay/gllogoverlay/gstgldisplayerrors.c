@@ -46,7 +46,6 @@
 #include "gst/gst-i18n-plugin.h"
 
 #include "gstgldisplayerrors.h"
-//#include "gldisplayerrors.h"
 
 #define USE_PEER_BUFFERALLOC
 #define SUPPORTED_GL_APIS (GST_GL_API_OPENGL | GST_GL_API_OPENGL3 | GST_GL_API_GLES2)
@@ -61,13 +60,11 @@ enum
   PROP_IS_LIVE,
   PROP_FONT_CAPTION,
   PROP_FONT_STYLE,
-  PROP_SET_ERRORS,
   PROP_SET_HISTORY_SIZE,
   PROP_CLEAR,
   PROP_SORTING,
-  PROP_TEXT_COLOR_ARGB,
-  PROP_BG_COLOR_ARGB
-      /* FILL ME */
+  PROP_TEXT_COLOR_ARGB
+  /* FILL ME */
 };
 
 /* *INDENT-OFF* */
@@ -85,10 +82,7 @@ static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
 
 #define gst_gl_dispaly_errors_parent_class parent_class
 G_DEFINE_TYPE (GstGLDisplayErrors, gst_gl_dispaly_errors, GST_TYPE_PUSH_SRC);
-/*
-static void gst_gl_dispaly_errors_set_pattern (GstGLDisplayErrors * gldisplayerrors,
-    int pattern_type);
-    */
+
 static void gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
 static void gst_gl_dispaly_errors_get_property (GObject * object, guint prop_id,
@@ -114,9 +108,6 @@ static gboolean gst_gl_dispaly_errors_start (GstBaseSrc * basesrc);
 static gboolean gst_gl_dispaly_errors_stop (GstBaseSrc * basesrc);
 static gboolean gst_gl_dispaly_errors_decide_allocation (GstBaseSrc * basesrc,
     GstQuery * query);
-/*
-static gboolean gst_gl_dispaly_errors_callback (gpointer stuff);
-*/
 
 static gboolean gst_gl_dispaly_errors_init_shader (GstGLDisplayErrors * gldisplayerrors);
 
@@ -126,40 +117,6 @@ static GstFlowReturn gst_gl_dispaly_errors_chain (GstPad * pad,
 static void gst_gl_dispaly_errors_dispose (GObject * object);
 
 #define gst_gl_dispaly_errors_parent_class parent_class
-
-/*
-#define GST_TYPE_GL_DISPLAY_ERRORS_PATTERN (gst_gl_dispaly_errors_pattern_get_type ())
-static GType
-gst_gl_dispaly_errors_pattern_get_type (void)
-{
-  static GType gl_dispaly_errors_pattern_type = 0;
-  static const GEnumValue pattern_types[] = {
-    {GST_GL_DISPLAY_ERRORS_SMPTE, "SMPTE 100% color bars", "smpte"},
-    {GST_GL_DISPLAY_ERRORS_SNOW, "Random (television snow)", "snow"},
-    {GST_GL_DISPLAY_ERRORS_BLACK, "100% Black", "black"},
-    {GST_GL_DISPLAY_ERRORS_WHITE, "100% White", "white"},
-    {GST_GL_DISPLAY_ERRORS_RED, "Red", "red"},
-    {GST_GL_DISPLAY_ERRORS_GREEN, "Green", "green"},
-    {GST_GL_DISPLAY_ERRORS_BLUE, "Blue", "blue"},
-    {GST_GL_DISPLAY_ERRORS_CHECKERS1, "Checkers 1px", "checkers-1"},
-    {GST_GL_DISPLAY_ERRORS_CHECKERS2, "Checkers 2px", "checkers-2"},
-    {GST_GL_DISPLAY_ERRORS_CHECKERS4, "Checkers 4px", "checkers-4"},
-    {GST_GL_DISPLAY_ERRORS_CHECKERS8, "Checkers 8px", "checkers-8"},
-    {GST_GL_DISPLAY_ERRORS_CIRCULAR, "Circular", "circular"},
-    {GST_GL_DISPLAY_ERRORS_BLINK, "Blink", "blink"},
-    {GST_GL_DISPLAY_ERRORS_MANDELBROT, "Mandelbrot Fractal", "mandelbrot"},
-    {0, NULL, NULL}
-  };
-
-  if (!gl_dispaly_errors_pattern_type) {
-    gl_dispaly_errors_pattern_type =
-        g_enum_register_static ("GstGLDisplayErrorsPattern", pattern_types);
-  }
-  return gl_dispaly_errors_pattern_type;
-}
-*/
-
-
 
 static GstCaps *
 gst_gl_dispaly_errors_fixate (GstBaseSrc * bsrc, GstCaps * caps)
@@ -181,18 +138,10 @@ gst_gl_dispaly_errors_fixate (GstBaseSrc * bsrc, GstCaps * caps)
   return caps;
 }
 
-/*
-static void
-gst_gl_dispaly_errors_set_pattern (GstGLDisplayErrors * gldisplayerrors, gint pattern_type)
-{
-  gldisplayerrors->set_pattern = pattern_type;
-}
-*/
 
 static void
 gst_gl_dispaly_errors_close_gldraw (GstGLContext * context, GstGLDisplayErrors * src){
   if(src->gl_drawing.gl_drawing_created==TRUE){
-    //errors_handler_clear(&src->gl_drawing, src->errors_handler);
     gldraw_close (src->context, &src->gl_drawing);
     src->gl_drawing.gl_drawing_created=FALSE;
   }
@@ -205,21 +154,15 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
   GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (object);
 
   switch (prop_id) {
- /*   case PROP_PATTERN:
-      gst_gl_dispaly_errors_set_pattern (src, g_value_get_enum (value));
-      break;*/
+
     case PROP_TIMESTAMP_OFFSET:
       src->timestamp_offset = g_value_get_int64 (value);
       break;
     case PROP_IS_LIVE:
       gst_base_src_set_live (GST_BASE_SRC (src), g_value_get_boolean (value));
       break;
-    case PROP_SET_ERRORS:
-      //gldraw_set_error_codes(&src->gl_drawing,g_value_get_int(value));
-      break;
     case PROP_SET_HISTORY_SIZE:
       gldraw_set_history_errors_window_size(&src->gl_drawing, g_value_get_int(value));
-      //errors_handler_redraw_content(src->errors_handler);
       if(src->context){
         gst_gl_context_thread_add (src->context,
           (GstGLContextThreadFunc) gst_gl_dispaly_errors_close_gldraw, src);
@@ -228,17 +171,8 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
     case PROP_TEXT_COLOR_ARGB:
         gldraw_set_text_color(&src->gl_drawing, g_value_get_uint(value));
       break;
-    case PROP_BG_COLOR_ARGB:
-        gldraw_set_bg_color(&src->gl_drawing, g_value_get_uint(value));
-      break;
-
     case PROP_SORTING:
       errors_handler_set_sorting(src->errors_handler, g_value_get_int(value));
-      //gldraw_clear_errors(&src->gl_drawing);
-      //if(src->context){
-      //  gst_gl_context_thread_add (src->context,
-      //    (GstGLContextThreadFunc) gst_gl_dispaly_errors_close_gldraw, src);
-      //}
       break;
     case PROP_CLEAR:
       errors_handler_clear(&src->gl_drawing, src->errors_handler);
@@ -275,41 +209,24 @@ static void
 gst_gl_dispaly_errors_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
+
   GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (object);
 
   switch (prop_id) {
-/*    case PROP_PATTERN:
-      g_value_set_enum (value, src->set_pattern);
-      break;
-      */
     case PROP_TIMESTAMP_OFFSET:
       g_value_set_int64 (value, src->timestamp_offset);
       break;
     case PROP_IS_LIVE:
       g_value_set_boolean (value, gst_base_src_is_live (GST_BASE_SRC (src)));
       break;
-/*    case PROP_FONT_CAPTION:
-      g_value_set_string(value, gldraw_get_font_caption(src));
-      //void gldraw_set_font_caption(GlDrawing *src, char *font_caption);
-      //char *gldraw_get_font_caption(GlDrawing *src);
-      break;
-    case PROP_FONT_STYLE:
-      g_value_set_string(value, gldraw_get_font_style(src));
-      break;
-    //case PROP_SET_ERRORS:
-    //  g_value_set_int(value, gldraw_get_error_codes(&src->gl_drawing));
-    //  break;
-*/
     case PROP_TEXT_COLOR_ARGB:
       g_value_set_uint(value, gldraw_get_text_color(&src->gl_drawing));
-      break;
-    case PROP_BG_COLOR_ARGB:
-      g_value_set_uint(value, gldraw_get_bg_color(&src->gl_drawing));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
   }
+
 }
 
 static gboolean
@@ -451,10 +368,6 @@ gst_gl_dispaly_errors_init_shader (GstGLDisplayErrors * gldisplayerrors)
 {
   if (gst_gl_context_get_gl_api (gldisplayerrors->context)) {
     /* blocking call, wait until the opengl thread has compiled the shader */
-//    if (gldisplayerrors->vertex_src == NULL)
-//      return FALSE;
-//    return gst_gl_context_gen_shader (gldisplayerrors->context, gldisplayerrors->vertex_src,
-//        gldisplayerrors->fragment_src, &gldisplayerrors->shader);
   }
   return TRUE;
 }
@@ -463,7 +376,6 @@ gst_gl_dispaly_errors_init_shader (GstGLDisplayErrors * gldisplayerrors)
 static gboolean
 gst_gl_dispaly_errors_callback (gpointer stuff)
 {
-  //GstGLSoundbar *src = GST_GLSOUNDBAR (stuff);
 
   GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (stuff);
 
@@ -472,20 +384,9 @@ gst_gl_dispaly_errors_callback (gpointer stuff)
 
   unsigned int bg_color=0x00ff00ff;
 
-  //int i;
-
   if(!GST_IS_CLOCK(src->pipeline_clock)){
     src->pipeline_clock=gst_element_get_clock(src);
   }
-
-/*
-  if(src->pipeline_clock!=NULL){
-    gst_object_unref(src->pipeline_clock);
-       //src->pipeline_clock=NULL;
-  }
-
-  src->pipeline_clock=gst_element_get_clock(src);
-*/
 
   errors_handler_set_pipeline_clock(src->errors_handler,src->pipeline_clock);
   gldraw_clear_set_pipeline_clock(&src->gl_drawing,src->pipeline_clock);
@@ -497,7 +398,6 @@ gst_gl_dispaly_errors_callback (gpointer stuff)
     g=(float)((bg_color & 0x0000ff00)>>8)/255.0;
     b=(float)((bg_color & 0x000000ff))/255.0;
 
-    //errors_handler_clear(&src->gl_drawing, src->errors_handler);
     errors_handler_redraw_content(src->errors_handler);
     res =  gldraw_init (src->context, &src->gl_drawing,
                                                 src->vinfo.width, src->vinfo.height,
@@ -505,13 +405,10 @@ gst_gl_dispaly_errors_callback (gpointer stuff)
                                                 0,
                                                 r,g,b,a);
 
-    //src->gl_drawing_created=TRUE;
 
     if(!res) {
       GST_ERROR (src, "Failed to initialize gldraw_init: \n %s",src->gl_drawing.error_message);
-      //errors_handler_clear(&src->gl_drawing, src->errors_handler);
       gldraw_close (src->context, &src->gl_drawing);
-      //src->gl_drawing_created=FALSE;
       return FALSE;
     }
 
@@ -529,13 +426,9 @@ gst_gl_dispaly_errors_callback (gpointer stuff)
 static void
 _fill_gl (GstGLContext * context, GstGLDisplayErrors * src)
 {
-    //<<<
-  //src->gl_result = gst_gl_framebuffer_draw_to_texture (src->fbo, src->out_tex,
-    //  gst_gl_dispaly_errors_callback, src);
 
   src->gl_result = gst_gl_framebuffer_draw_to_texture (src->fbo, src->out_tex,
       gst_gl_dispaly_errors_callback, src);
-
 
 }
 
@@ -637,26 +530,10 @@ gst_gl_dispaly_errors_gl_stop (GstGLContext * context, GstGLDisplayErrors * src)
     gst_object_unref (src->fbo);
   src->fbo = NULL;
 
-/*
-  //<<< shader?
-  if (src->shader)
-    gst_object_unref (src->shader);
-  src->shader = NULL;
-*/
-
-  //int result;
-
   if(src->gl_drawing.gl_drawing_created==TRUE){
-    //errors_handler_clear(&src->gl_drawing, src->errors_handler);
     gldraw_close (src->context, &src->gl_drawing);
     src->gl_drawing.gl_drawing_created=FALSE;
   }
-
-/*
-  if (src->src_impl)
-    src->src_funcs->free (src->src_impl);
-  src->src_impl = NULL;
-  */
 
 }
 
@@ -737,7 +614,6 @@ gst_gl_dispaly_errors_decide_allocation (GstBaseSrc * basesrc, GstQuery * query)
   if ((gst_gl_context_get_gl_api (src->context) & SUPPORTED_GL_APIS) == 0)
     goto unsupported_gl_api;
 
-//<<<
   if (src->context)
     gst_gl_context_thread_add (src->context,
         (GstGLContextThreadFunc) gst_gl_dispaly_errors_gl_stop, src);
@@ -821,38 +697,6 @@ context_error:
   }
 }
 
-/*
-static gboolean
-gst_gl_dispaly_errors_callback (gpointer stuff)
-{
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (stuff);
-  const struct SrcFuncs *funcs;
-
-  funcs = src->src_funcs;
-
-  if (!funcs || src->set_pattern != src->active_pattern) {
-    if (src->src_impl && funcs)
-      funcs->free (src->src_impl);
-    src->src_funcs = funcs =
-        gst_gl_dispaly_errors_get_src_funcs_for_pattern (src->set_pattern);
-    if (funcs == NULL) {
-      GST_ERROR_OBJECT (src, "Could not find an implementation of the "
-          "requested pattern");
-      return FALSE;
-    }
-    src->src_impl = funcs->new (src);
-    if (!(src->gl_result =
-            funcs->init (src->src_impl, src->context, &src->vinfo))) {
-      GST_ERROR_OBJECT (src, "Failed to initialize pattern");
-      return FALSE;
-    }
-    src->active_pattern = src->set_pattern;
-  }
-
-  return funcs->fill_bound_fbo (src->src_impl);
-}
-*/
-
 static GstStateChangeReturn
 gst_gl_dispaly_errors_change_state (GstElement * element, GstStateChange transition)
 {
@@ -927,9 +771,6 @@ static void gst_gl_dispaly_errors_dispose (GObject * object){
 
 }
 
-
-
-
 static void
 gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
 {
@@ -951,12 +792,6 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
 
   gobject_class->dispose = gst_gl_dispaly_errors_dispose;
 
-/*
-  g_object_class_install_property (gobject_class, PROP_PATTERN,
-      g_param_spec_enum ("pattern", "Pattern",
-          "Type of test pattern to generate", GST_TYPE_GL_DISPLAY_ERRORS_PATTERN,
-          GST_GL_DISPLAY_ERRORS_SMPTE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  */
   g_object_class_install_property (gobject_class,
       PROP_TIMESTAMP_OFFSET, g_param_spec_int64 ("timestamp-offset",
           "Timestamp offset",
@@ -967,12 +802,6 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
       g_param_spec_boolean ("is-live", "Is Live",
           "Whether to act as a live source", FALSE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class,
-      PROP_SET_ERRORS, g_param_spec_int ("set-errors",
-          "Set errors",
-          "Set errors as bits: 0x01|0x02|0x04|0x08|0x10 = error1|error2|warning1|warning2|message1 ", G_MININT,
-          G_MAXINT, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class,
       PROP_SET_HISTORY_SIZE, g_param_spec_int ("set-history-size",
@@ -986,15 +815,11 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
           "Sorting: 0=by time, 1=by priority ", G_MININT,
           G_MAXINT, 5, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-
   g_object_class_install_property (gobject_class,
       PROP_CLEAR, g_param_spec_int ("clear",
           "clear",
           "clear ", G_MININT,
           G_MAXINT, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-
-
 
   g_object_class_install_property (gobject_class, PROP_FONT_CAPTION,
       g_param_spec_string("font-caption", "Font caption",
@@ -1006,18 +831,11 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
           "Font style", "",
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property(gobject_class, PROP_BG_COLOR_ARGB,
-         g_param_spec_uint("bg-color-argb", "Backgound color ARGB",
-                          "Backgound color ARGB",
-                          0, G_MAXUINT32, 0x88000000,
-                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS ));
-
   g_object_class_install_property(gobject_class, PROP_TEXT_COLOR_ARGB,
          g_param_spec_uint("text-color-argb", "Text color ARGB",
                           "Text color ARGB",
                           0, G_MAXUINT32, 0xff000000,
                           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS ));
-
 
   gst_element_class_set_metadata (element_class, "gldisplayerrors",
       "Gl display errors", "Gl display errors",
@@ -1045,51 +863,13 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
 
 }
 
-
-
-
 static GstFlowReturn
 gst_gl_dispaly_errors_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
 {
 
   GstGLDisplayErrors *src;
-
-
-
   src = GST_GL_DISPLAY_ERRORS (parent);
-
-
-
-     /*
-     typedef struct {
- int severity;
- int source;
- int type;
- __int64_t timestamp;
- __int64_t delta_lasting;
- char msg[INPUT_ERROR_MSG_MAX_SIZE];
-
-}InputError;
-
-     */
-
-
-  //InputError input_errors[all_errors_count];
-
-
-  //__uint64_t time1;
-  //time1=gst_clock_get_time(src->pipeline_clock);
-/*
-  __uint64_t time2;
-  time2=GST_BUFFER_PTS(buffer);
-
-  __uint64_t time3;
-  time3=GST_BUFFER_DTS(buffer);
-*/
-
-
-
 
   int size_data;
   size_data=gst_buffer_get_size(buffer);
@@ -1097,13 +877,10 @@ gst_gl_dispaly_errors_chain (GstPad * pad, GstObject * parent,
   GstMapInfo amap;
 
   gst_buffer_map (buffer, &amap, GST_MAP_READ);
-  //(gpointer *)amap.data, amap.size
 
-  //memcpy(input_errors, amap.data, size_data);
   if(size_data>0){
     errors_handler_add_errors(src->errors_handler, (InputError *)amap.data, size_data/sizeof(InputError));
   }
-
 
   gst_buffer_unmap (buffer, &amap);
   gst_buffer_unref(buffer);
@@ -1118,9 +895,6 @@ gst_gl_dispaly_errors_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
   gboolean res=TRUE;
-  //GstGLDisplayErrors *scope;
-
-  //scope = GST_GL_DISPLAY_ERRORS (parent);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_CAPS:
@@ -1128,17 +902,11 @@ gst_gl_dispaly_errors_sink_event (GstPad * pad, GstObject * parent,
       GstCaps *caps;
 
       gst_event_parse_caps (event, &caps);
-      //res = gst_gl_dispaly_errors_sink_setcaps (scope, caps);
       res=TRUE;
       gst_event_unref (event);
       break;
     }
-    //case GST_EVENT_FLUSH_STOP:
-      //gst_gl_dispaly_errors_reset (scope);
-      //res = gst_pad_push_event (scope->priv->srcpad, event);
-      //break;
     default:
-      //res = gst_pad_event_default (pad, parent, event);
       gst_event_unref (event);
       break;
   }
@@ -1150,7 +918,6 @@ gst_gl_dispaly_errors_sink_event (GstPad * pad, GstObject * parent,
 static void
 gst_gl_dispaly_errors_init (GstGLDisplayErrors * src)
 {
-  //gst_gl_dispaly_errors_set_pattern (src, GST_GL_DISPLAY_ERRORS_SMPTE);
 
   src->timestamp_offset = 0;
 
@@ -1160,15 +927,10 @@ gst_gl_dispaly_errors_init (GstGLDisplayErrors * src)
 
   src->pipeline_clock=NULL;
 
-  //src->gl_drawing_created=FALSE;
-  //src->gl_drawing->gl_drawing_created=0;//<<<
   gldraw_first_init(&src->gl_drawing);
   src->errors_handler=(ErrorsHandler *)malloc(sizeof(ErrorsHandler));
   errors_handler_first_init(src->errors_handler);
   gldraw_set_error_draw_callback(&src->gl_drawing, src->errors_handler, errors_handler_draw_callback);
-
-
-  //errors_handler_first_init(&src->errors_handler);
 
   GstGLDisplayErrorsClass *filter_class = GST_GL_DISPLAY_ERRORS_CLASS (G_OBJECT_GET_CLASS (src));
 
@@ -1184,16 +946,6 @@ gst_gl_dispaly_errors_init (GstGLDisplayErrors * src)
   gst_pad_set_event_function (src->sinkpad,
       GST_DEBUG_FUNCPTR (gst_gl_dispaly_errors_sink_event));
   gst_element_add_pad (GST_ELEMENT (src), src->sinkpad);
-
-
-
-
-/*
-  if(src->gl_drawing.gl_drawing_created==TRUE){
-    gldraw_close (src->context, &src->gl_drawing, &src->result);
-  }
-*/
-
 
 }
 

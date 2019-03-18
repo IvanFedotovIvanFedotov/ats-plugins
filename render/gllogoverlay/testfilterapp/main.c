@@ -1,3 +1,11 @@
+/* USING
+./testfilterapp test1
+./testfilterapp test2
+./testfilterapp test3
+
+print font list:
+./testfilterapp fonts
+*/
 
 #include <gst/gst.h>
 #include <unistd.h>
@@ -320,7 +328,7 @@ void *thread_function1(void *data){
 
          test_counter=0;
          while(!end_flag){
-           usleep(500000);
+           usleep(450000);
 
            if((test_counter % 10) == 0){
              input_errors[0].severity=3;
@@ -473,17 +481,17 @@ void *thread_function1(void *data){
              push_buf_to_gldisplayerrors(input_errors, 4);
            }
 
-           /*
+/*
            //sorts switch test:
-           if((test_counter % 10) == 8){
+           if((test_counter % 20) == 10){
              //g_object_set(gldisplayerrors,"set-history-size",3,NULL);
-             //g_object_set(gldisplayerrors,"clear",0,NULL);
-             g_object_set(gldisplayerrors,"sort",sort_selector,NULL);
+             g_object_set(gldisplayerrors,"clear",0,NULL);
+             //g_object_set(gldisplayerrors,"sort",sort_selector,NULL);
              sort_selector++;
              if(sort_selector>1)sort_selector=0;
 
            }
-           */
+*/
 
              input_errors[0].severity=1;
              input_errors[0].source=1;
@@ -808,6 +816,8 @@ gint pipeline_test (gint argc, gchar *argv[])
       w=1424;
       h=868;
 
+      gltestsrc =  gst_element_factory_make("gltestsrc", "_gltestsrc_");
+
       appsrc = gst_element_factory_make("appsrc", "_appsrc_");
       appsrc2 = gst_element_factory_make("appsrc", "_appsrc2_");
 
@@ -840,6 +850,17 @@ gint pipeline_test (gint argc, gchar *argv[])
       g_object_set (G_OBJECT (filtercaps2), "caps", filtercaps_caps2, NULL);
       gst_caps_unref (filtercaps_caps2);
 
+      sprintf(buf1,"video/x-raw(memory:GLMemory),"
+                   "format=(string)RGBA,"
+                   "width=(int)%d,"
+                   "height=(int)%d,"
+                   "framerate=(fraction)25/1,"
+                   "texture-target=(string)2D",w/2,h/2);
+      filtercaps3 = gst_element_factory_make("capsfilter","_filtercaps3_");
+      filtercaps_caps3 = gst_caps_from_string(buf1);
+      g_object_set (G_OBJECT (filtercaps3), "caps", filtercaps_caps3, NULL);
+      gst_caps_unref (filtercaps_caps3);
+
 
       sprintf(buf1,"video/x-raw(memory:GLMemory),"
                    "format=(string)RGBA,"
@@ -868,26 +889,22 @@ gint pipeline_test (gint argc, gchar *argv[])
       }
 
       g_object_set (G_OBJECT (appsrc), "caps",
-/*
-  		gst_caps_new_simple ("video/x-raw",
-				     "format", G_TYPE_STRING, "RGB16",
-				     "width", G_TYPE_INT, 384,
-				     "height", G_TYPE_INT, 288,
-				     "framerate", GST_TYPE_FRACTION, 0, 1,
-				     NULL), NULL);
-*/
   		gst_caps_new_simple ("application/x-bin-error-log",NULL),
   	  NULL);
 
       gst_bin_add_many (GST_BIN (pipeline),
-        appsrc,
 
+        appsrc,
         gldisplayerrors,
         filtercaps1,
+
         glvideomixer,
         filtercaps5,
         glimagesink,
 
+        gltestsrc,
+        filtercaps3,
+
         appsrc2,
         gldisplayerrors2,
         filtercaps2,
@@ -902,11 +919,19 @@ gint pipeline_test (gint argc, gchar *argv[])
         NULL);
 
       gst_element_link_many(
+        gltestsrc,
+        filtercaps3,
+        glvideomixer,
+        NULL);
+
+      gst_element_link_many(
         appsrc2,
         gldisplayerrors2,
         filtercaps2,
         glvideomixer,
         NULL);
+
+
 
       gst_element_link_many(glvideomixer, filtercaps5, glimagesink);
 
@@ -918,6 +943,14 @@ gint pipeline_test (gint argc, gchar *argv[])
       g_object_set(pad,"height",h/2,NULL);
 
       sprintf(str1,"sink_1");
+      pad=gst_element_get_static_pad(glvideomixer,str1);
+      g_object_set(pad,"xpos",w/2,NULL);
+      g_object_set(pad,"ypos",0,NULL);
+      g_object_set(pad,"width",w/2,NULL);
+      g_object_set(pad,"height",h/2,NULL);
+
+
+      sprintf(str1,"sink_2");
       pad=gst_element_get_static_pad(glvideomixer,str1);
       g_object_set(pad,"xpos",w/2,NULL);
       g_object_set(pad,"ypos",0,NULL);

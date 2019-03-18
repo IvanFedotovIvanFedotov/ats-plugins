@@ -45,7 +45,6 @@ G_BEGIN_DECLS
 #define GST_IS_GL_DISPLAY_ERRORS_CLASS(klass) \
     (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_GL_DISPLAY_ERRORS))
 
-//typedef struct _GstGLDisplayErrorsPrivate GstGLDisplayErrorsPrivate;
 typedef struct _GstGLDisplayErrors GstGLDisplayErrors;
 typedef struct _GstGLDisplayErrorsClass GstGLDisplayErrorsClass;
 
@@ -59,17 +58,11 @@ struct _GstGLDisplayErrors {
 
     /*< private >*/
 
-    /* type of output */
-    //GstGLDisplayErrorsPattern set_pattern;
-    //GstGLDisplayErrorsPattern active_pattern;
-
     /* video state */
     GstVideoInfo vinfo;
 
     GstGLFramebuffer *fbo;
     GstGLMemory *out_tex;
-
-    //GstGLShader *shader;
 
     GstBufferPool *pool;
 
@@ -82,19 +75,13 @@ struct _GstGLDisplayErrors {
 
     gboolean gl_result;
 
-    //const struct SrcFuncs *src_funcs;
-    //gpointer src_impl;
-
     GstCaps *out_caps;
-
 
     GstPad *sinkpad;
     GstClock *pipeline_clock;
 
     GlDrawing gl_drawing;
     ErrorsHandler *errors_handler;
-
-
 
 };
 
