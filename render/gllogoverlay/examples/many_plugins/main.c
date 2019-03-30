@@ -1,10 +1,10 @@
-/* USING
-./testfilterapp test1
-./testfilterapp test2
-./testfilterapp test3
+/* USING 
+./testfilterapp
 
-print font list:
-./testfilterapp fonts
+change:
+  #define gldisplayerrors_arr_num 16   = all plugins num
+  #define gldisplayerrors_rows_num 4   = plugins per row
+
 */
 
 #include <gst/gst.h>
@@ -25,7 +25,7 @@ print font list:
 
 //#include "../gldisplayerrors/gldisplayerrors/gstgldisplayerrors.h"
 
-#define arr_size 16
+
 
 
 
@@ -92,14 +92,16 @@ void print_all_fonts(){
 
 
 
+  #define gldisplayerrors_arr_num 16
+  #define gldisplayerrors_rows_num 4
+
 
   int thread1_loops=0;
 
   GstStateChangeReturn ret;
   GstElement *pipeline;
   GstElement *gltestsrc, *gltestsrc2, *glsoundbar, *glsoundbar2, *glimagesink,
-             *gldisplayerrors,
-             *gldisplayerrors2,
+
              *audiotestsrc, *audiotestsrc2, *alsasink, *wavescope, *wavescope2, *glvideomixer,
              *gltransformation, *gltransformation2,
              *filesrc, *qtdemux, *parser, *faad,
@@ -114,19 +116,19 @@ void print_all_fonts(){
              *autoaudiosink,
              *autovideosink,
 
-             *wavescope_arr[arr_size],
-             *gltestsrc_arr[arr_size],
-             *audiotestsrc_arr[arr_size],
-             *glsoundbar_arr[arr_size],
-             *gltransformation_arr[arr_size],
+             *wavescope_arr[gldisplayerrors_arr_num],
+             *gltestsrc_arr[gldisplayerrors_arr_num],
+             *audiotestsrc_arr[gldisplayerrors_arr_num],
+             *glsoundbar_arr[gldisplayerrors_arr_num],
+             *gltransformation_arr[gldisplayerrors_arr_num],
 
-             *avenc_mp2_arr[arr_size],
-             *avdec_mp2_arr[arr_size],
-             *decodebin_arr[arr_size],
-             *queue_arr[arr_size],
-             *audioconvert_arr[arr_size],
-             *filtercaps_audioconvert_arr[arr_size],
-             //*filtercaps_audiotestsrc_arr[arr_size],
+             *avenc_mp2_arr[gldisplayerrors_arr_num],
+             *avdec_mp2_arr[gldisplayerrors_arr_num],
+             *decodebin_arr[gldisplayerrors_arr_num],
+             *queue_arr[gldisplayerrors_arr_num],
+             *audioconvert_arr[gldisplayerrors_arr_num],
+             *filtercaps_audioconvert_arr[gldisplayerrors_arr_num],
+             //*filtercaps_audiotestsrc_arr[gldisplayerrors_arr_num],
 
              *avenc_mp2,
              *avdec_mp2,
@@ -140,10 +142,8 @@ void print_all_fonts(){
              *videoconvert,
              *vaapienc,
              *videomux_for_vaapi,
-             *videotestsrc,
+             *videotestsrc
 
-             *appsrc,
-             *appsrc2
 
              ;
 
@@ -152,14 +152,20 @@ void print_all_fonts(){
 
   int video_file_index=0;
 
-  GstCaps    *filtercaps_caps_audiotestsrc_arr[arr_size];
-  GstElement *filtercaps_audiotestsrc_arr[arr_size];
 
-  GstCaps    *filtercaps_caps_glsoundbar_arr[arr_size];
-  GstElement *filtercaps_glsoundbar_arr[arr_size];
+  GstElement *gldisplayerrors[gldisplayerrors_arr_num],
+             *appsrc[gldisplayerrors_arr_num];
+
+  GstCaps    *filtercaps_gldisplayerrors_caps_arr[gldisplayerrors_arr_num];
+  GstElement *filtercaps_gldisplayerrors_arr[gldisplayerrors_arr_num];
 
   GstCaps    *filtercaps_caps_mix;
   GstElement *filtercaps_mix;
+
+
+
+
+
 
 
   //считает фактические перезапуски pipeline
@@ -235,34 +241,26 @@ static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_erro
   guint size;
   GstFlowReturn ret;
 
+  int i;
+  char str1[1000];
+
   //if (!want) return;
   //want = 0;
 
   size = sizeof(InputError)*input_errors_num;
 
-  buffer1 = gst_buffer_new_wrapped_full( 0, (gpointer)input_errors, size, 0, size, NULL, NULL );
-  GST_BUFFER_PTS (buffer1) = timestamp;
-  GST_BUFFER_DURATION (buffer1) = gst_util_uint64_scale_int (1, GST_SECOND, 10);
+  for(i=0;i<gldisplayerrors_arr_num;i++){
+    sprintf(str1,"src", i);
+    pad=gst_element_get_static_pad(appsrc[i],str1);
 
-  buffer2 = gst_buffer_new_wrapped_full( 0, (gpointer)input_errors, size, 0, size, NULL, NULL );
-  GST_BUFFER_PTS (buffer2) = timestamp;
-  GST_BUFFER_DURATION (buffer2) = gst_util_uint64_scale_int (1, GST_SECOND, 10);
+    buffer1 = gst_buffer_new_wrapped_full( 0, (gpointer)input_errors, size, 0, size, NULL, NULL );
+    GST_BUFFER_PTS (buffer1) = timestamp;
+    GST_BUFFER_DURATION (buffer1) = gst_util_uint64_scale_int (1, GST_SECOND, 3);
+    if(i==0)timestamp += GST_BUFFER_DURATION (buffer1);
 
-
-  timestamp += GST_BUFFER_DURATION (buffer1);
-
-
-  if(gldisplayerrors_sink_pad1==NULL){
-    gldisplayerrors_sink_pad1=gst_element_get_static_pad(appsrc,"src");
+    ret=gst_pad_push(pad, buffer1);
+    gst_object_unref(pad);
   }
-
-  if(gldisplayerrors_sink_pad2==NULL){
-    gldisplayerrors_sink_pad2=gst_element_get_static_pad(appsrc2,"src");
-  }
-
-
-  ret=gst_pad_push(gldisplayerrors_sink_pad1, buffer1);
-  ret=gst_pad_push(gldisplayerrors_sink_pad2, buffer2);
 
   //ret = gst_app_src_push_buffer(appsrc, buffer);
 
@@ -290,13 +288,20 @@ void *thread_function1(void *data){
 
 
   int reboot_num=0;
+  thread1_loops=0;
 
-  sleep(1);
+  sleep(2);
 
-  pipeline_clock=gst_element_get_clock(pipeline);
+  pipeline_clock=NULL;
 
    //общий цикл, для выполнения перезагрузок (если они требуются)
   while(!end_flag){
+
+
+    if(pipeline_clock==NULL){
+      pipeline_clock=gst_element_get_clock(glvideomixer);
+      //pipeline_clock=gst_element_get_clock(pipeline);
+    }
 
     //sleep(1);
     g_mutex_lock(&mutex_pool_releaseing);
@@ -306,9 +311,7 @@ void *thread_function1(void *data){
        int test_selector=1;
        int test_counter=0;
        if(strcmp(((char *)data),"test1")==0 || strcmp(((char *)data),"")==0)test_selector=1;
-       if(strcmp(((char *)data),"test2")==0)test_selector=2;
-       if(strcmp(((char *)data),"test3")==0)test_selector=3;
-       if(strcmp(((char *)data),"fonts")==0)test_selector=4;
+
 
 
 
@@ -317,7 +320,7 @@ void *thread_function1(void *data){
 
        sort_selector=0;
 
-       g_object_set(gldisplayerrors,"set-history-size",10,NULL);
+       //g_object_set(gldisplayerrors,"set-history-size",10,NULL);
        //g_object_set(gldisplayerrors,"sort",1,NULL);
 
        //g_object_set(gldisplayerrors,"text-color-argb",0xffff0000,NULL);
@@ -328,6 +331,12 @@ void *thread_function1(void *data){
 
          test_counter=0;
          while(!end_flag){
+
+           if(pipeline_clock==NULL){
+             pipeline_clock=gst_element_get_clock(glvideomixer);
+             //pipeline_clock=gst_element_get_clock(pipeline);
+           }
+
            usleep(450000);
 
            if((test_counter % 10) == 0){
@@ -346,7 +355,7 @@ void *thread_function1(void *data){
 
 
 
-
+/*
            if((test_counter % 40) == 10){
 
              thread1_loops++;
@@ -370,7 +379,8 @@ void *thread_function1(void *data){
              g_object_set(pad,"height",sizey,NULL);
 
            }
-
+*/
+/*
            if((test_counter % 40) == 30){
 
              usleep(3000000);
@@ -395,6 +405,7 @@ void *thread_function1(void *data){
              g_object_set(pad,"height",sizey,NULL);
 
            }
+*/
 
            input_errors[0].severity=1;
            input_errors[0].source=1;
@@ -434,193 +445,45 @@ void *thread_function1(void *data){
 
            err_sends_counter++;
            if(err_sends_counter>8)err_sends_counter=0;
-         }
-
-
-      }
 
 
 
 
-     if(test_selector==2){
-
-         test_counter=0;
-         while(!end_flag){
-           usleep(500000);
-
-           if((test_counter % 10) == 0){
-             input_errors[0].severity=1;
-             input_errors[0].source=1;
-             input_errors[0].type=1;
-             input_errors[0].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[0].delta_lasting=1000000000;
-             strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
-
-             input_errors[1].severity=2;
-             input_errors[1].source=2;
-             input_errors[1].type=1;
-             input_errors[1].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[1].delta_lasting=1000000000;
-             strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
-
-             input_errors[2].severity=3;
-             input_errors[2].source=3;
-             input_errors[2].type=1;
-             input_errors[2].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[2].delta_lasting=1000000000;
-             strcpy(input_errors[2].msg,"3.Редкая ошибка.");
-
-             input_errors[3].severity=4;
-             input_errors[3].source=4;
-             input_errors[3].type=1;
-             input_errors[3].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[3].delta_lasting=1000000000;
-             strcpy(input_errors[3].msg,"4.Редкая ошибка.");
+           thread1_loops++;
 
 
-             push_buf_to_gldisplayerrors(input_errors, 4);
+           //Если используется перезагрузка приложения (разкомментировать):
+           if(thread1_loops>20){
+             reboot_num=0;
+             end_flag=1;
+             gst_element_post_message(pipeline, gst_message_new_eos(GST_OBJECT(pipeline)));
+             gst_element_set_state (pipeline, GST_STATE_NULL);
+             g_main_loop_quit (loop);
+
            }
+
+           reboot_num++;
+
+
+
+
+
+         }//while(!end_flag)
+
+
+      }//if(test_selector==1)
+
+
+
+
 
 /*
-           //sorts switch test:
-           if((test_counter % 20) == 10){
-             //g_object_set(gldisplayerrors,"set-history-size",3,NULL);
-             g_object_set(gldisplayerrors,"clear",0,NULL);
-             //g_object_set(gldisplayerrors,"sort",sort_selector,NULL);
-             sort_selector++;
-             if(sort_selector>1)sort_selector=0;
-
-           }
-*/
-
-             input_errors[0].severity=1;
-             input_errors[0].source=1;
-             input_errors[0].type=1;
-             input_errors[0].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[0].delta_lasting=1000000000;
-             strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
-
-             //push_buf_to_gldisplayerrors(&input_errors[1], 1);
-
-             input_errors[1].severity=2;
-             input_errors[1].source=2;
-             input_errors[1].type=1;
-             input_errors[1].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[1].delta_lasting=1000000000;
-             strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
-
-
-             //push_buf_to_gldisplayerrors(&input_errors[2], 1);
-
-             push_buf_to_gldisplayerrors(input_errors, 2);
-
-
-             test_counter++;
-
-
-
-           err_sends_counter++;
-           if(err_sends_counter>8)err_sends_counter=0;
-         }
-
-      }
-
-
-
-
-      if(test_selector==3){
-
-         test_counter=0;
-         while(!end_flag){
-           usleep(500000);
-
-           if((test_counter % 20) < 12){
-             input_errors[0].severity=1;
-             input_errors[0].source=1;
-             input_errors[0].type=1;
-             input_errors[0].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[0].delta_lasting=1000000000;
-             strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
-
-             input_errors[1].severity=2;
-             input_errors[1].source=2;
-             input_errors[1].type=1;
-             input_errors[1].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[1].delta_lasting=1000000000;
-             strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
-
-             input_errors[2].severity=3;
-             input_errors[2].source=3;
-             input_errors[2].type=1;
-             input_errors[2].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[2].delta_lasting=1000000000;
-             strcpy(input_errors[2].msg,"3.Приоритет.");
-
-             push_buf_to_gldisplayerrors(input_errors, 3);
-           }
-
-           /*
-           //sorts switch test:
-           if((test_counter % 10) == 8){
-             //g_object_set(gldisplayerrors,"set-history-size",3,NULL);
-             //g_object_set(gldisplayerrors,"clear",0,NULL);
-             g_object_set(gldisplayerrors,"sort",sort_selector,NULL);
-             sort_selector++;
-             if(sort_selector>1)sort_selector=0;
-
-           }
-           */
-
-           /*
-             input_errors[0].severity=1;
-             input_errors[0].source=1;
-             input_errors[0].type=1;
-             input_errors[0].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[0].delta_lasting=1000000000;
-             strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
-
-             //push_buf_to_gldisplayerrors(&input_errors[1], 1);
-
-             input_errors[1].severity=2;
-             input_errors[1].source=2;
-             input_errors[1].type=1;
-             input_errors[1].timestamp=gst_clock_get_time(pipeline_clock);
-             input_errors[1].delta_lasting=1000000000;
-             strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
-
-
-             //push_buf_to_gldisplayerrors(&input_errors[2], 1);
-
-             push_buf_to_gldisplayerrors(input_errors, 2);
-           */
-
-
-             test_counter++;
-
-
-
-           err_sends_counter++;
-           if(err_sends_counter>8)err_sends_counter=0;
-         }
-
-      }
-
-
-      if(test_selector==4){
-        print_all_fonts();
-        while(!end_flag){
-          usleep(500000);
-        }
-      }
-
-
-
       g_object_set (G_OBJECT (appsrc),
 		"stream-type", 0, // GST_APP_STREAM_TYPE_STREAM
 		"format", GST_FORMAT_TIME,
         "is-live", FALSE,
         NULL);
-
+*/
 
 
 
@@ -628,9 +491,6 @@ void *thread_function1(void *data){
 
 
 
-    thread1_loops++;
-
-    g_mutex_unlock(&mutex_pool_releaseing);
 
     //Если используется перезагрузка приложения (разкомментировать):
     if(reboot_num>1){
@@ -642,9 +502,11 @@ void *thread_function1(void *data){
 */
     }
 
+    g_mutex_unlock(&mutex_pool_releaseing);
     reboot_num++;
 
-  }
+  }//while
+
 
 
 
@@ -801,7 +663,7 @@ gint pipeline_test (gint argc, gchar *argv[])
 
 
   int i;
-  gchar str1[100];
+  gchar str1[1000];
 
 
   switch (selector) {
@@ -810,153 +672,7 @@ gint pipeline_test (gint argc, gchar *argv[])
     case 1:
     {
 
-      int w,h;
-      char buf1[1000];
-
-      w=1424;
-      h=868;
-
-      gltestsrc =  gst_element_factory_make("gltestsrc", "_gltestsrc_");
-
-      appsrc = gst_element_factory_make("appsrc", "_appsrc_");
-      appsrc2 = gst_element_factory_make("appsrc", "_appsrc2_");
-
-      gldisplayerrors = gst_element_factory_make("gldisplayerrors", "_gldisplayerrors_");
-      gldisplayerrors2 = gst_element_factory_make("gldisplayerrors", "_gldisplayerrors2_");
-
-      glvideomixer = gst_element_factory_make ("glvideomixer", "_glvideomixer_");
-      glimagesink  = gst_element_factory_make ("glimagesink", "_glimagesink_");
-
-
-      sprintf(buf1,"video/x-raw(memory:GLMemory),"
-                   "format=(string)RGBA,"
-                   "width=(int)%d,"
-                   "height=(int)%d,"
-                   "framerate=(fraction)25/1,"
-                   "texture-target=(string)2D",w/2,h/2);
-      filtercaps1 = gst_element_factory_make("capsfilter","_filtercaps1_");
-      filtercaps_caps1= gst_caps_from_string(buf1);
-      g_object_set (G_OBJECT (filtercaps1), "caps", filtercaps_caps1, NULL);
-      gst_caps_unref (filtercaps_caps1);
-
-      sprintf(buf1,"video/x-raw(memory:GLMemory),"
-                   "format=(string)RGBA,"
-                   "width=(int)%d,"
-                   "height=(int)%d,"
-                   "framerate=(fraction)25/1,"
-                   "texture-target=(string)2D",w/2,h/2);
-      filtercaps2 = gst_element_factory_make("capsfilter","_filtercaps2_");
-      filtercaps_caps2 = gst_caps_from_string(buf1);
-      g_object_set (G_OBJECT (filtercaps2), "caps", filtercaps_caps2, NULL);
-      gst_caps_unref (filtercaps_caps2);
-
-      sprintf(buf1,"video/x-raw(memory:GLMemory),"
-                   "format=(string)RGBA,"
-                   "width=(int)%d,"
-                   "height=(int)%d,"
-                   "framerate=(fraction)25/1,"
-                   "texture-target=(string)2D",w/2,h/2);
-      filtercaps3 = gst_element_factory_make("capsfilter","_filtercaps3_");
-      filtercaps_caps3 = gst_caps_from_string(buf1);
-      g_object_set (G_OBJECT (filtercaps3), "caps", filtercaps_caps3, NULL);
-      gst_caps_unref (filtercaps_caps3);
-
-
-      sprintf(buf1,"video/x-raw(memory:GLMemory),"
-                   "format=(string)RGBA,"
-                   "width=(int)%d,"
-                   "height=(int)%d,"
-                   "framerate=(fraction)25/1,"
-                   "texture-target=(string)2D",w,h);
-      filtercaps5 = gst_element_factory_make("capsfilter","_filtercaps5_");
-      filtercaps_caps5 = gst_caps_from_string(buf1);
-      g_object_set (G_OBJECT (filtercaps5), "caps", filtercaps_caps5, NULL);
-      gst_caps_unref (filtercaps_caps5);
-
-
-
-
-
-
-
-
-      if (!gldisplayerrors
-          || !glvideomixer
-          || !glimagesink
-          ) {
-        g_print ("Error init\n");
-        return -1;
-      }
-
-      g_object_set (G_OBJECT (appsrc), "caps",
-  		gst_caps_new_simple ("application/x-bin-error-log",NULL),
-  	  NULL);
-
-      gst_bin_add_many (GST_BIN (pipeline),
-
-        appsrc,
-        gldisplayerrors,
-        filtercaps1,
-
-        glvideomixer,
-        filtercaps5,
-        glimagesink,
-
-        gltestsrc,
-        filtercaps3,
-
-        appsrc2,
-        gldisplayerrors2,
-        filtercaps2,
-
-        NULL);
-
-      gst_element_link_many(
-        appsrc,
-        gldisplayerrors,
-        filtercaps1,
-        glvideomixer,
-        NULL);
-
-      gst_element_link_many(
-        gltestsrc,
-        filtercaps3,
-        glvideomixer,
-        NULL);
-
-      gst_element_link_many(
-        appsrc2,
-        gldisplayerrors2,
-        filtercaps2,
-        glvideomixer,
-        NULL);
-
-
-
-      gst_element_link_many(glvideomixer, filtercaps5, glimagesink);
-
-      sprintf(str1,"sink_0");
-      pad=gst_element_get_static_pad(glvideomixer,str1);
-      g_object_set(pad,"xpos",0,NULL);
-      g_object_set(pad,"ypos",0,NULL);
-      g_object_set(pad,"width",w/2,NULL);
-      g_object_set(pad,"height",h/2,NULL);
-
-      sprintf(str1,"sink_1");
-      pad=gst_element_get_static_pad(glvideomixer,str1);
-      g_object_set(pad,"xpos",w/2,NULL);
-      g_object_set(pad,"ypos",0,NULL);
-      g_object_set(pad,"width",w/2,NULL);
-      g_object_set(pad,"height",h/2,NULL);
-
-
-      sprintf(str1,"sink_2");
-      pad=gst_element_get_static_pad(glvideomixer,str1);
-      g_object_set(pad,"xpos",w/2,NULL);
-      g_object_set(pad,"ypos",0,NULL);
-      g_object_set(pad,"width",w/2,NULL);
-      g_object_set(pad,"height",h/2,NULL);
-
+/*
 
       //g_object_set(gldisplayerrors,"set-errors",0x07,NULL);
 
@@ -983,8 +699,110 @@ gint pipeline_test (gint argc, gchar *argv[])
       //gldisplayerrors_sink_pad=gst_element_get_static_pad(gldisplayerrors,"sink");
 
       //g_signal_connect (appsrc, "need-data", G_CALLBACK (cb_need_data), NULL);
+*/
+
+
+
+
+
+
+
+
+/*
+  GstElement *gldisplayerrors[gldisplayerrors_arr_num],
+             *appsrc[gldisplayerrors_arr_num],
+
+  GstCaps    *filtercaps_gldisplayerrors_caps_arr[gldisplayerrors_arr_num];
+  GstElement *filtercaps_gldisplayerrors_arr[gldisplayerrors_arr_num];
+
+  GstCaps    *filtercaps_caps_mix;
+  GstElement *filtercaps_mix;
+*/
+
+     int w,h,wm,hm;
+     char buf1[1000];
+
+     w=1424;
+     h=868;
+     wm=w/(gldisplayerrors_arr_num/gldisplayerrors_rows_num);
+     hm=h/gldisplayerrors_rows_num;
+
+
+     for(i=0;i<gldisplayerrors_arr_num;i++){
+
+      sprintf(str1,"_appsrc_%d",i);
+      appsrc[i]=gst_element_factory_make ("appsrc", str1);
+
+      sprintf(str1,"_gldisplayerrors_%d",i);
+      gldisplayerrors[i]=gst_element_factory_make ("gldisplayerrors", str1);
+
+      sprintf(buf1,"video/x-raw(memory:GLMemory),"
+                   "format=(string)RGBA,"
+                   "width=(int)%d,"
+                   "height=(int)%d,"
+                   "framerate=(fraction)25/1,"
+                   "texture-target=(string)2D",wm,hm);
+      sprintf(str1,"_filtercaps_gldisplayerrors_arr_%d",i);
+      filtercaps_gldisplayerrors_arr[i] = gst_element_factory_make("capsfilter",str1);
+      filtercaps_gldisplayerrors_caps_arr[i] = gst_caps_from_string(buf1);
+      g_object_set (G_OBJECT (filtercaps_gldisplayerrors_arr[i]), "caps", filtercaps_gldisplayerrors_caps_arr[i], NULL);
+      gst_caps_unref (filtercaps_gldisplayerrors_caps_arr[i]);
+
+     }
+
+      sprintf(buf1,"video/x-raw(memory:GLMemory),"
+                   "format=(string)RGBA,"
+                   "width=(int)%d,"
+                   "height=(int)%d,"
+                   "framerate=(fraction)25/1,"
+                   "texture-target=(string)2D",w,h);
+      filtercaps_mix = gst_element_factory_make("capsfilter","_filtercaps_mix_");
+      filtercaps_caps_mix = gst_caps_from_string(buf1);
+      g_object_set (G_OBJECT (filtercaps_mix), "caps", filtercaps_caps_mix, NULL);
+      gst_caps_unref (filtercaps_caps_mix);
+
+      glvideomixer = gst_element_factory_make ("glvideomixer", "_glvideomixer_");
+      glimagesink  = gst_element_factory_make ("glimagesink", "_glimagesink_");
+
+      for(i=0;i<gldisplayerrors_arr_num;i++){
+        if(!appsrc[i] || !gldisplayerrors[i] ||
+           !glvideomixer || !glimagesink){
+          g_print ("Error init\n");
+          return -1;
+        }
+      }
+
+      for(i=0;i<gldisplayerrors_arr_num;i++){
+        gst_bin_add(GST_BIN (pipeline),appsrc[i]);
+        gst_bin_add(GST_BIN (pipeline),gldisplayerrors[i]);
+        gst_bin_add(GST_BIN (pipeline),filtercaps_gldisplayerrors_arr[i]);
+      }
+      gst_bin_add(GST_BIN (pipeline),filtercaps_mix);
+      gst_bin_add(GST_BIN (pipeline),glvideomixer);
+      gst_bin_add(GST_BIN (pipeline),glimagesink);
+
+      for(i=0;i<gldisplayerrors_arr_num;i++){
+        gst_element_link_many(appsrc[i],gldisplayerrors[i],filtercaps_gldisplayerrors_arr[i],glvideomixer,NULL);
+      }
+
+      gst_element_link_many(glvideomixer, filtercaps_mix, glimagesink);
+
+      //gldisplayerrors_arr_num/gldisplayerrors_rows_num
+      for(i=0;i<gldisplayerrors_arr_num;i++){
+        sprintf(str1,"sink_%d", i);
+        pad=gst_element_get_static_pad(glvideomixer,str1);
+        g_object_set(pad,"xpos", (i % (gldisplayerrors_arr_num / gldisplayerrors_rows_num)) * wm,NULL);
+        g_object_set(pad,"ypos",( gldisplayerrors_rows_num * i / gldisplayerrors_arr_num) * hm, NULL);
+        g_object_set(pad,"width",wm,NULL);
+        g_object_set(pad,"height",hm,NULL);
+        gst_object_unref(pad);
+      }
+
+
+
 
       break;
+
     }
 
 
@@ -1039,11 +857,9 @@ main (gint   argc,
       gchar *argv[])
 {
 
-
   setenv("GST_DEBUG","3",FALSE);
 
   //setenv("MESA_GL_VERSION_OVERRIDE",3.0,FALSE);
-
 
   setenv("GST_GL_PLATFORM","egl",FALSE);
 
@@ -1054,13 +870,9 @@ main (gint   argc,
   //setenv("GST_GL_API","gles2",FALSE);
   setenv("GST_GL_API","opengl3",FALSE);
 
-
-
-
   g_mutex_init (&mutex_pool_releaseing);
 
   g_mutex_lock(&mutex_pool_releaseing);
-
 
   char buf[1000];
 
@@ -1068,31 +880,32 @@ main (gint   argc,
     strcpy(buf,argv[1]);
   }
 
-  end_flag=0;
+
 
   //Отдельный тред для изменений параметров тестируемого плагина
-  thread1=g_thread_create(thread_function1,buf,TRUE,NULL);
+  //end_flag=0;
+  //thread1=g_thread_create(thread_function1,buf,TRUE,NULL);
+  //pipeline_test(argc,argv);
 
   //Цикл для бесконечной перезагрузки приложения
-  //while(1){
-
+  while(1){
+    end_flag=0;
+    thread1=g_thread_create(thread_function1,buf,TRUE,NULL);
     pipeline_test(argc,argv);
+    sleep(2);
+  }
 
-  //}
+
 
   g_mutex_unlock(&mutex_pool_releaseing);
-
-
 
   if (mutex_pool_releaseing.p) {
     g_mutex_clear (&mutex_pool_releaseing);
     mutex_pool_releaseing.p = NULL;
   }
 
-
-
-
   return 0;
+
 }
 
 

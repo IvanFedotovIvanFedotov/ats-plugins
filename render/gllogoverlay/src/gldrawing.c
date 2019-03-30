@@ -54,7 +54,7 @@
 #define NK_INCLUDE_FONT_BAKING
 #define NK_INCLUDE_DEFAULT_FONT
 #define NK_IMPLEMENTATION
-#include "nuklear.h"
+#include "../../nuklear/nuklear.h"
 
 #define MAX_VERTEX_MEMORY 512 * 1024
 #define MAX_ELEMENT_MEMORY 128 * 1024
@@ -280,7 +280,56 @@ void gldraw_set_error_draw_callback(GlDrawing *src,
 
 }
 
+typedef struct{
+  nk_rune rune;
+  int rune_len;
+}rune_ex;
 
+
+int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_pixels_str_len){
+
+  if(font_ptr==NULL)return 0;
+
+  int runes_sz,cur_pix_len,runes_less_num,chars_less_num;
+  rune_ex rune;
+  int i,inp_sz;
+
+  nk_handle handle1;
+  handle1.ptr=font_ptr;
+
+  inp_sz=strlen(str);
+
+  if(inp_sz==0)return 0;
+
+  runes_sz=nk_utf_len(str, inp_sz);
+
+  if(runes_sz==0)return 0;
+
+  cur_pix_len=0;
+  runes_less_num=0;
+  chars_less_num=0;
+  for(i=0;i<runes_sz;i++){
+    nk_utf_at(str,inp_sz,i,&rune.rune,&rune.rune_len);
+    if(chars_less_num+rune.rune_len>inp_sz){
+        break;
+    }
+    cur_pix_len+=nk_font_text_width(handle1,font_ptr->info.height,&str[chars_less_num],rune.rune_len);
+    if(cur_pix_len>max_pixels_str_len){
+        runes_less_num--;
+        chars_less_num-=rune.rune_len;
+        break;
+    }
+    chars_less_num+=rune.rune_len;
+    runes_less_num++;
+
+  }
+
+  return chars_less_num;
+
+}
+
+
+/*
 int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_pixels_str_len){
 
   if(font_ptr==NULL)return 0;
@@ -315,6 +364,7 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
   return str_len;
 
 }
+*/
 
 
 float calc_bigtextline_ly(GlDrawing *src){

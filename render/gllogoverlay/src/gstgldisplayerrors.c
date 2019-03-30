@@ -384,12 +384,25 @@ gst_gl_dispaly_errors_callback (gpointer stuff)
 
   unsigned int bg_color=0x00ff00ff;
 
-  if(!GST_IS_CLOCK(src->pipeline_clock)){
+
+
+
+  if(src->pipeline_clock==NULL){
     src->pipeline_clock=gst_element_get_clock(src);
+    //GstClockTime time1;
+    //time1=gst_clock_get_time(src->pipeline_clock);
+    //gst_object_unref(src->pipeline_clock);
   }
 
   errors_handler_set_pipeline_clock(src->errors_handler,src->pipeline_clock);
   gldraw_clear_set_pipeline_clock(&src->gl_drawing,src->pipeline_clock);
+
+  //if(!GST_IS_CLOCK(src->pipeline_clock)){
+  //if(!GST_IS_SYSTEM_CLOCK(src->pipeline_clock)){
+  //  src->pipeline_clock=gst_element_get_clock(src);
+  //}
+
+
 
   if(src->gl_drawing.gl_drawing_created==0){
 
