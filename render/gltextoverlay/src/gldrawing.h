@@ -34,6 +34,7 @@
 #define MAX_ATTRIBUTES 4
 
 struct nk_custom;
+//struct nk_rune;
 
 #define FONT_CAPTION_DEFAULT "Noto Serif Display"
 #define FONT_STYLE_DEFAULT "Medium"
@@ -70,6 +71,9 @@ typedef struct{
   GLuint text_fbo;
 
   char text[TEXT_MAX_SIZE];
+
+  //nk_rune array:
+  unsigned int custom_range[TEXT_MAX_SIZE*2+1];
 
   //interval [0.0,1.0] values:
   float text_texture_x, text_texture_y, text_texture_lx, text_texture_ly;
