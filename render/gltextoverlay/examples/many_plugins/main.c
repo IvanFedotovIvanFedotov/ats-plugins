@@ -1,10 +1,10 @@
 /* USING 2
-./testfilterapp test1
-./testfilterapp test2
-./testfilterapp test3
+./testfilterapp
 
-print font list:
-./testfilterapp fonts
+change:
+  #define gldisplayerrors_arr_num 64    = plugins num
+  #define gldisplayerrors_rows_num 8    = plugins num in one row
+
 */
 
 #include <gst/gst.h>
