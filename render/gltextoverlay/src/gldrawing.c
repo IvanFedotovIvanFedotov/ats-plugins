@@ -198,7 +198,6 @@ static const GLchar *vertex_shader =
         "   Frag_Color = Color;\n"
         "   pos4 = ProjMtx * vec4(Position.x,height-Position.y, 0.0, 1.0);\n"
         "   gl_Position = vec4(pos4.x,pos4.y,pos4.z,pos4.w);\n"
-        "   return;"
         "}\n";
 
 
@@ -235,10 +234,6 @@ typedef struct{
 
 //return 1 if no errors
 int custom_range_gliphs(GlDrawing *src, char *input_text){
-
-  //src->custom_range[0]
-  //nk_utf_decode
-  //NK_GLOBAL const nk_byte nk_utfmask[NK_UTF_SIZE+1] = {0xC0, 0x80, 0xE0, 0xF0, 0xF8};
 
   int inp_sz,runes_sz;
   int i,sorted;
@@ -299,85 +294,6 @@ int custom_range_gliphs(GlDrawing *src, char *input_text){
   return 1;
 
 }
-
-int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_pixels_str_len){
-
-  if(font_ptr==NULL)return 0;
-
-  int runes_sz,cur_pix_len,runes_less_num,chars_less_num;
-  rune_ex rune;
-  int i,inp_sz;
-
-  nk_handle handle1;
-  handle1.ptr=font_ptr;
-
-  inp_sz=strlen(str);
-
-  if(inp_sz==0)return 0;
-
-  runes_sz=nk_utf_len(str, inp_sz);
-
-  if(runes_sz==0)return 0;
-
-  cur_pix_len=0;
-  runes_less_num=0;
-  chars_less_num=0;
-  for(i=0;i<runes_sz;i++){
-    nk_utf_at(str,inp_sz,i,&rune.rune,&rune.rune_len);
-    if(chars_less_num+rune.rune_len>inp_sz){
-        break;
-    }
-    cur_pix_len+=nk_font_text_width(handle1,font_ptr->info.height,&str[chars_less_num],rune.rune_len);
-    if(cur_pix_len>max_pixels_str_len){
-        runes_less_num--;
-        chars_less_num-=rune.rune_len;
-        break;
-    }
-    chars_less_num+=rune.rune_len;
-    runes_less_num++;
-
-  }
-
-  return chars_less_num;
-
-}
-
-
-
-/*
-int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_pixels_str_len){
-
-  if(font_ptr==NULL)return 0;
-
-  int str_len,str_len2;
-  int len_pix;
-  nk_handle handle1;
-  handle1.ptr=font_ptr;
-
-  str_len2=strlen(str);
-  str_len=str_len2;
-
-  int i;
-  for(i=str_len2;i>0;i--){
-    len_pix=nk_font_text_width(handle1,font_ptr->info.height,str,str_len);
-    if(len_pix<=max_pixels_str_len)break;
-    str_len--;
-    if(str_len<=0)return 0;
-    if(str[str_len-1]&0xC0){
-      str_len--;
-    }
-
-  }
-
-  if(str_len<=0)return 0;
-
-
-  return str_len;
-
-}
-*/
-
-
 
 void find_font_file(GlDrawing *src){
 
@@ -535,7 +451,6 @@ void calc_texture_xy_at_align(GlDrawing *src){
 
 
 
-
 gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
                       int width, int height,
                       float fps,
@@ -546,16 +461,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
                       float bg_color_a)
 {
 
-
-
-
-
-
     gldraw_close(context,src);
-
-    //strcpy(src->text,"абвгабвгггдд 2\0");
-    //strcpy(src->text,"text1 Текст Длинный");
-
 
     find_font_file(src);
     if(src->font_full_filename[0]==0)return FALSE;
@@ -750,8 +656,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
     int font_w, font_h;
 
     struct nk_font_config conf = nk_font_config(0);
-    //<<<
-    //conf.range = &nk_font_russian_glyph_ranges[0];
+
     conf.range=(nk_rune*)src->custom_range;
 
     int font_size;
@@ -926,22 +831,25 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 
     // iterate over and execute each draw command
     nk_draw_foreach(cmd, &src->all_context_nk->ctx, &src->all_context_nk->ogl.cmds) {
-        if (!cmd->elem_count) continue;
-        glBindTexture(GL_TEXTURE_2D, (GLuint)cmd->texture.id);
-        err=glGetError();
 
-        GLint x,y,lx,ly;
-        x=(GLint)((cmd->clip_rect.x-1));
-        y=(GLint)((cmd->clip_rect.y-1));
-        lx=(GLint)((cmd->clip_rect.w+1));
-        ly=(GLint)((cmd->clip_rect.h+1));
+      if (!cmd->elem_count) continue;
+      glBindTexture(GL_TEXTURE_2D, (GLuint)cmd->texture.id);
+      err=glGetError();
 
-        glScissor(x,y,lx,ly);
+      GLint x,y,lx,ly;
+      x=(GLint)((cmd->clip_rect.x-1));
+      y=(GLint)((cmd->clip_rect.y-1));
+      lx=(GLint)((cmd->clip_rect.w+1));
+      ly=(GLint)((cmd->clip_rect.h+1));
 
-        glDrawElements(GL_TRIANGLES, (GLsizei)cmd->elem_count, GL_UNSIGNED_SHORT, offset);
-        err=glGetError();
-        offset += cmd->elem_count;
+      glScissor(x,y,lx,ly);
+
+      glDrawElements(GL_TRIANGLES, (GLsizei)cmd->elem_count, GL_UNSIGNED_SHORT, offset);
+      err=glGetError();
+      offset += cmd->elem_count;
+
     }
+
     nk_clear(&src->all_context_nk->ctx);
 
     gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -974,11 +882,6 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 }
 
 
-
-
-
-
-
 gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 {
 
@@ -989,7 +892,6 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     int i;
 
     if(src->font_full_filename[0]==0)return FALSE;
-    //if(src->all_context_nk==NULL)return FALSE;
 
     GLfloat ortho[4][4] = {
         {2.0f, 0.0f, 0.0f, 0.0f},

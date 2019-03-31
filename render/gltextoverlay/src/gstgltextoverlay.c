@@ -88,10 +88,7 @@ static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
 
 #define gst_gl_text_overlay_parent_class parent_class
 G_DEFINE_TYPE (GstGLTextOverlay, gst_gl_text_overlay, GST_TYPE_PUSH_SRC);
-/*
-static void gst_gl_text_overlay_set_pattern (GstGLTextOverlay * gltextoverlay,
-    int pattern_type);
-    */
+
 static void gst_gl_text_overlay_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
 static void gst_gl_text_overlay_get_property (GObject * object, guint prop_id,
@@ -117,54 +114,12 @@ static gboolean gst_gl_text_overlay_start (GstBaseSrc * basesrc);
 static gboolean gst_gl_text_overlay_stop (GstBaseSrc * basesrc);
 static gboolean gst_gl_text_overlay_decide_allocation (GstBaseSrc * basesrc,
     GstQuery * query);
-/*
-static gboolean gst_gl_text_overlay_callback (gpointer stuff);
-*/
 
 static gboolean gst_gl_text_overlay_init_shader (GstGLTextOverlay * gltextoverlay);
-
-/*
-static GstFlowReturn gst_gl_text_overlay_chain (GstPad * pad,
-    GstObject * parent, GstBuffer * buffer);
-*/
 
 static void gst_gl_text_overlay_dispose (GObject * object);
 
 #define gst_gl_text_overlay_parent_class parent_class
-
-/*
-#define GST_TYPE_GL_TEXT_OVERLAY_PATTERN (gst_gl_text_overlay_pattern_get_type ())
-static GType
-gst_gl_text_overlay_pattern_get_type (void)
-{
-  static GType gl_text_overlay_pattern_type = 0;
-  static const GEnumValue pattern_types[] = {
-    {GST_GL_TEXT_OVERLAY_SMPTE, "SMPTE 100% color bars", "smpte"},
-    {GST_GL_TEXT_OVERLAY_SNOW, "Random (television snow)", "snow"},
-    {GST_GL_TEXT_OVERLAY_BLACK, "100% Black", "black"},
-    {GST_GL_TEXT_OVERLAY_WHITE, "100% White", "white"},
-    {GST_GL_TEXT_OVERLAY_RED, "Red", "red"},
-    {GST_GL_TEXT_OVERLAY_GREEN, "Green", "green"},
-    {GST_GL_TEXT_OVERLAY_BLUE, "Blue", "blue"},
-    {GST_GL_TEXT_OVERLAY_CHECKERS1, "Checkers 1px", "checkers-1"},
-    {GST_GL_TEXT_OVERLAY_CHECKERS2, "Checkers 2px", "checkers-2"},
-    {GST_GL_TEXT_OVERLAY_CHECKERS4, "Checkers 4px", "checkers-4"},
-    {GST_GL_TEXT_OVERLAY_CHECKERS8, "Checkers 8px", "checkers-8"},
-    {GST_GL_TEXT_OVERLAY_CIRCULAR, "Circular", "circular"},
-    {GST_GL_TEXT_OVERLAY_BLINK, "Blink", "blink"},
-    {GST_GL_TEXT_OVERLAY_MANDELBROT, "Mandelbrot Fractal", "mandelbrot"},
-    {0, NULL, NULL}
-  };
-
-  if (!gl_text_overlay_pattern_type) {
-    gl_text_overlay_pattern_type =
-        g_enum_register_static ("GstGLTextOverlayPattern", pattern_types);
-  }
-  return gl_text_overlay_pattern_type;
-}
-*/
-
-
 
 static GstCaps *
 gst_gl_text_overlay_fixate (GstBaseSrc * bsrc, GstCaps * caps)

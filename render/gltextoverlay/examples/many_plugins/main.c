@@ -1,4 +1,7 @@
-/* USING 2
+/* USING
+ 
+ Test draws many plugin instances. Restart plugins after 10 seconds.
+ 
 ./testfilterapp
 
 change:
@@ -648,20 +651,6 @@ gint pipeline_test (gint argc, gchar *argv[])
 
   /* run */
   ret = gst_element_set_state (pipeline, GST_STATE_PLAYING);
-
-/*
-  sleep(5);
-  ret = gst_element_set_state (pipeline, GST_STATE_PAUSED);
-  sleep(5);
-  ret = gst_element_set_state (pipeline, GST_STATE_PLAYING);
-  sleep(5);
-  ret = gst_element_set_state (pipeline, GST_STATE_READY);
-  sleep(5);
-  ret = gst_element_set_state (pipeline, GST_STATE_PLAYING);
-  sleep(1);
-  ret = gst_element_set_state (pipeline, GST_STATE_NULL);
-*/
-
 
 
   g_mutex_unlock(&mutex_pool_releaseing);

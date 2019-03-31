@@ -34,7 +34,6 @@
 #define MAX_ATTRIBUTES 4
 
 struct nk_custom;
-//struct nk_rune;
 
 #define FONT_CAPTION_DEFAULT "Noto Serif Display"
 #define FONT_STYLE_DEFAULT "Medium"
