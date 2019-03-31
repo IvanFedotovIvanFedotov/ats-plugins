@@ -222,12 +222,6 @@ void gldraw_set_error_draw_callback(GlDrawing *src,
                                     );
 
 
-
-
-
-//gboolean gldraw_set_error_codes(GlDrawing *src, int codes);
-//int gldraw_get_error_codes(GlDrawing *src);
-
 gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
                       int width, int height,
                       float fps,

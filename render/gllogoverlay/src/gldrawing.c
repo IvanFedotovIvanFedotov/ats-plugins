@@ -87,7 +87,7 @@ struct nk_sdl_vertex {
 };
 
 static struct nk_custom {
-    //SDL_Window *win;
+
     struct nk_sdl_device ogl;
     struct nk_context ctx;
     struct nk_font_atlas atlas;
@@ -100,19 +100,6 @@ static struct nk_custom {
 };
 
 #define NK_SHADER_VERSION "#version 150\n"
-
-typedef struct
-{
-  gfloat X, Y;
-}XY2;
-
-/* *INDENT-OFF* */
-static const GLfloat positions2[] = {
-     -1.0,  1.0,
-      1.0,  1.0,
-      1.0, -1.0,
-     -1.0, -1.0
-};
 
 
 void gldraw_clear_set_pipeline_clock(GlDrawing *src, GstClock *_pipeline_clock){
@@ -183,23 +170,14 @@ static const GLchar *vertex_shader =
         "   Frag_UV = TexCoord;\n"
         "   Frag_Color = Color;\n"
         "   pos4 = ProjMtx * vec4(Position.x,height-Position.y, 0.0, 1.0);\n"
-        //"   pos4 = ProjMtx * vec4(Position.x,Position.y, 0.0, 1.0);\n"
         "   gl_Position = vec4(pos4.x,pos4.y,pos4.z,pos4.w);\n"
-        "   return;"
-        //"   gl_Position = vec4(Position,0.0,1.0);\n"
-        "   vec2 pos;"
-        "   pos=Position;"
-        "   pos=pos/250.0;"//-vec2(1.0,1.0);"
-        "   gl_Position = vec4(pos,0.0,1.0);\n"
         "}\n";
 
 static const GLchar *fragment_shader =
         NK_SHADER_VERSION
-        //"layout(origin_upper_left) in vec4 gl_FragCoord;"
         "#ifdef GL_ES\n"
         "precision mediump float;\n"
          "#endif\n"
-        //"precision mediump float;\n"
         "uniform sampler2D Texture;\n"
         "varying vec2 Frag_UV;\n"
         "varying vec4 Frag_Color;\n"
@@ -207,12 +185,10 @@ static const GLchar *fragment_shader =
         "uniform vec4 bg_color;"
 
         "void main(){\n"
-        //"   gl_FragColor=vec4(1.0,0.5,0.0,1.0)+Frag_Color;"
         " if(bg_fill_flag==0){"
         "   gl_FragColor = Frag_Color * texture2D(Texture, Frag_UV);\n"
         " }else{"
         "   gl_FragColor = bg_color;\n"
-        //"   gl_FragColor = vec4(0.0,0.0,0.0,0.0);\n"
         " }"
         "}\n";
 
@@ -329,51 +305,15 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
 }
 
 
-/*
-int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_pixels_str_len){
-
-  if(font_ptr==NULL)return 0;
-
-  int str_len,str_len2;
-  int len_pix;
-  nk_handle handle1;
-  handle1.ptr=font_ptr;
-
-  str_len2=strlen(str);
-  str_len=str_len2;
-
-  int i;
-  for(i=str_len2;i>0;i--){
-    len_pix=nk_font_text_width(handle1,font_ptr->info.height,str,str_len);
-    if(len_pix<=max_pixels_str_len)break;
-    str_len--;
-    if(str_len<=0)return 0;
-  }
-
-  if(str_len>0){
-    if( (str[str_len-1]&(0x1<<7))|(str[str_len-1]&(0x1<<6))|(!(str[str_len-1]&(0x1<<5)))>0 ){
-      str_len--;
-    }
-  }
-
-
-
-  if(str_len<=0)return 0;
-
-
-  return str_len;
-
-}
-*/
-
 
 float calc_bigtextline_ly(GlDrawing *src){
+
   return src->all_text_lines_ly_percent*((float)src->height)*0.3;
+
 }
 
 
 float calc_history_one_line_ly(GlDrawing *src){
-  //return ((float)src->history_textlines_ly)/((float)src->history_errors_window_size);
 
   if(src->history_errors_window_size==0)return 0;
   return (src->all_text_lines_ly_percent*(float)src->height-calc_bigtextline_ly(src))/((float)src->history_errors_window_size);
@@ -395,10 +335,6 @@ float gldraw_move_history_textlines_shift_y_only_one_frame(GlDrawing *src){
 }
 
 
-
-
-
-//fonts_num must <= SELECTED_FONT_PTRS_NUM
 void calc_one_line(GstClock *pipeline_clock,
                    TextRect *text_line,
                    float x, float y, float lx, float ly,
@@ -414,7 +350,7 @@ void calc_one_line(GstClock *pipeline_clock,
 
       int i;
 
-     //text_line=&src->small_textlines[i];
+
 
       text_line->border_thick=border_thick;
       if(text_line->border_thick<2.0)text_line->border_thick=2.0;
@@ -424,18 +360,12 @@ void calc_one_line(GstClock *pipeline_clock,
       text_line->lx=lx-text_line->border_thick/2.0;
       text_line->ly=ly-text_line->border_thick/2.0;
 
-      text_line->border_x=text_line->x;//+text_line->border_thick/2.0;
-      text_line->border_y=text_line->y;//+text_line->border_thick/2.0;
-      text_line->border_lx=text_line->lx;//-text_line->border_thick;
-      text_line->border_ly=text_line->ly;//-text_line->border_thick;
-
-      //text_line->border_blink_flag=0;
-
-      //text_line->time_text_visible=time_text_visible;
+      text_line->border_x=text_line->x;
+      text_line->border_y=text_line->y;
+      text_line->border_lx=text_line->lx;
+      text_line->border_ly=text_line->ly;
 
       text_line->background_enabled_flag=1;
-
-      //if(_fonts_ptrs!=NULL)text_line->text_ly=font_ptr->info.height;
 
       for(i=0;i<fonts_num;i++){
         text_line->fonts_ptrs[i]=_fonts_ptrs[i];
@@ -443,8 +373,6 @@ void calc_one_line(GstClock *pipeline_clock,
       text_line->fonts_ptrs_num=fonts_num;
 
       text_line->font_time_text_ptr=_font_time_text_ptr;
-
-      //text_line->selected_font_ptr=font_ptr;
 
       int severity;
 
@@ -459,10 +387,6 @@ void calc_one_line(GstClock *pipeline_clock,
              errors_properties[severity].background_color,
              4*sizeof(float));
 
-      //memcpy(text_line->text_color,
-      //       errors_properties[severity].text_color,
-      //       4*sizeof(float));
-
       text_line->text_color[0]=color_text[1];
       text_line->text_color[1]=color_text[2];
       text_line->text_color[2]=color_text[3];
@@ -472,28 +396,9 @@ void calc_one_line(GstClock *pipeline_clock,
       int len_cut;
       int max_text_len_pixels;
 
-
-/*            for(i=0;i<fonts_num;i++){
-        text_line->fonts_ptrs[i]=_fonts_ptrs[i];
-      }*/
-
-
-
-
-
-
-
       if(_fonts_ptrs!=NULL)text_line->text_ly=_fonts_ptrs[text_line->fonts_ptr_selected]->info.height;
       text_line->text_x=text_line->x+text_x_caption_begin_percent*text_line->lx;
       text_line->text_y=text_line->y+text_line->ly/2.0-text_line->text_ly/2.0;//text_line->y+text_y-text_line->border_thick/2.0;
-/*
-      if(text_line->displayedErrorData.flag_is_continuous==1){
-        text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
-      }else{
-        text_line->text_lx=text_x_time_end_percent*text_line->lx-text_line->x;
-      }
-*/
-
 
       double showed_time;
       __uint64_t current_time;
@@ -502,12 +407,10 @@ void calc_one_line(GstClock *pipeline_clock,
       int val;
 
       current_time=0;
-      //if(text_line->displayedErrorData.pipeline_clock==NULL)return;
+
       if(GST_IS_CLOCK(pipeline_clock)){
         current_time=gst_clock_get_time(pipeline_clock);
       }
-
-
 
       if(text_line->displayedErrorData.flag_is_continuous==1){
         showed_time=(current_time-text_line->displayedErrorData.timestamp)/1000000000;
@@ -538,33 +441,11 @@ void calc_one_line(GstClock *pipeline_clock,
           sprintf(text_line->text_time,"%02ds",s);
         }
 
-
-
-
-
       }else{
         sprintf(text_line->text_time,"\0");
-
-/*
-        sprintf(text_line->text_time,"%02d:%02d:%02d:%02d",
-                text_line->displayedErrorData.creation_time_d,
-                text_line->displayedErrorData.creation_time_h,
-                text_line->displayedErrorData.creation_time_m,
-                text_line->displayedErrorData.creation_time_s);
-*/
       }
-/*
-      if(text_line->displayedErrorData.flag_is_continuous==1){
-        if(strcmp(text_line->text_time,"00s")!=0){
-          int aaa;
-          aaa=0;
-        }
-      }
-*/
 
-      //if(text_line->displayedErrorData.flag_is_continuous==1){
-      //  text_line->text_lx=text_x_caption_end_percent*text_line->lx-text_line->x;
-      //}else{
+
       int len_pix;
       char buf1[100];
       nk_handle handle1;
@@ -573,18 +454,10 @@ void calc_one_line(GstClock *pipeline_clock,
         sprintf(buf1,"___%s\0",text_line->text_time);
       }else{
         buf1[0]='\0';
-        //if(text_line->text_line[0]=='2'){
-        //    int aa;
-        //    aa=0;
-        //}
-
       }
 
       len_pix=nk_font_text_width(handle1,text_line->font_time_text_ptr->info.height,buf1,strlen(buf1));
       text_line->text_lx=text_x_time_end_percent*text_line->lx-text_line->x-len_pix;
-      //}
-
-
 
       len=strlen(text_line->displayedErrorData.msg);
       max_text_len_pixels=text_line->text_lx;
@@ -600,16 +473,7 @@ void calc_one_line(GstClock *pipeline_clock,
          }
       }
 
-
-
-
       if(len>0 && len<text_line_size){
-
-         //len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[text_line->fonts_ptr_selected],
-         //                                         text_line->displayedErrorData.msg,
-         //                                         max_text_len_pixels);
-
-
 
          if(len_cut>0){
 
@@ -630,23 +494,13 @@ void calc_one_line(GstClock *pipeline_clock,
            text_line->text_line[0]=0;
          }
 
-
-         //text_line->text_line[len_cut+1]=0;
-
       }
-
-
-
-
-
-
 
       if(_fonts_ptrs!=NULL)text_line->text_time_ly=text_line->font_time_text_ptr->info.height;
       text_line->text_time_x=text_line->x+text_x_time_begin_percent*text_line->lx;
-      text_line->text_time_y=text_line->y+text_line->ly/2.0-text_line->text_time_ly/2.0;//-text_line->border_thick/2.0;
+      text_line->text_time_y=text_line->y+text_line->ly/2.0-text_line->text_time_ly/2.0;
       text_line->text_time_x_zone_begin=text_line->x+text_x_time_begin_percent*text_line->lx;
       text_line->text_time_x_zone_end=text_line->x+text_x_time_end_percent*text_line->lx;
-      //text_line->text_time_lx=text_line->text_time_x_zone_end-text_line->text_time_x_zone_begin;
 
       handle1.ptr=_font_time_text_ptr;
       text_line->text_time_lx=nk_font_text_width(handle1,_font_time_text_ptr->info.height,text_line->text_time,strlen(text_line->text_time));
@@ -666,11 +520,8 @@ void calc_all_draw_sizes(GlDrawing *src){
   int first_line_lower_window;
 
 
-
-
-
   x=0.03*src->width;
-  //y=src->history_textlines_y;
+
   y=floor(src->all_text_lines_begin_y_percent*((float)src->height)+calc_bigtextline_ly(src));
   lx=src->width-x*2;
   ly=floor(calc_history_one_line_ly(src));
@@ -705,7 +556,6 @@ void calc_all_draw_sizes(GlDrawing *src){
   lx=src->width-x*2;
   y=floor(src->all_text_lines_begin_y_percent*((float)src->height));
   ly=floor(calc_bigtextline_ly(src));
-  //y=src->history_textlines_y-ly;
 
   input_fonts[0]=src->font_big_text_line;
   calc_one_line(src->pipeline_clock,
@@ -746,15 +596,13 @@ void find_font_file(GlDrawing *src){
   FcPattern* pat = FcPatternCreate();
   FcObjectSet* os = FcObjectSetBuild (FC_FAMILY, FC_STYLE, FC_LANG, FC_FILE, (char *) 0);
   FcFontSet* fs = FcFontList(config, pat, os);
-  //printf("Total matching fonts: %d\n", fs->nfont);
+
   FcChar8 *file, *style, *family;
-  file=NULL;//(FcChar8 *)src->font_caption;
+  file=NULL;
   style=NULL;
   family=NULL;
-  //int k;
+
   int i;
-
-
 
   for (i=0; fs && i < fs->nfont; ++i) {
      FcPattern* font = fs->fonts[i];
@@ -763,8 +611,7 @@ void find_font_file(GlDrawing *src){
          FcPatternGetString(font, FC_FAMILY, 0, &family) == FcResultMatch &&
          FcPatternGetString(font, FC_STYLE, 0, &style) == FcResultMatch)
      {
-        //sprintf(buf,"Filename: [%s] family: [%s] style: [%s]\n", file, family, style);
-        //write(file1,buf,strlen(buf));
+
         if(strcmp(family,src->font_caption)==0 &&
            strcmp(style,src->font_style)==0){
             strcpy(src->font_full_filename,file);
@@ -812,12 +659,10 @@ void gldraw_first_init(GlDrawing *src){
   src->error_draw_callback_receiver=NULL;
 
   src->gl_drawing_created=0;
-  //src->error_codes_at_create=-1;
 
   src->font_full_filename[0]=0;
   gldraw_set_font_caption(src, FONT_CAPTION_DEFAULT);
   gldraw_set_font_style(src, FONT_STYLE_DEFAULT);
-//  find_font_file(src);
 
   src->all_context_nk=NULL;
   src->font_small_text_line=NULL;
@@ -851,16 +696,6 @@ void gldraw_first_init(GlDrawing *src){
 
   gldraw_set_history_errors_window_size(src, 5);
 
-
-  //---
-
-  //gldraw_clear_errors(src);
-
-
-
-
-  //---
-
 }
 
 
@@ -881,11 +716,6 @@ void gldraw_clear_errors(GlDrawing *src){
     src->history_textlines[i].displayedErrorData.flag_show_this=0;
 
   }
-
-  //memset(&src->big_textline,0,sizeof(TextRect));
-  //memset(src->history_textlines,0,sizeof(TextRect)*history_errors_full_max_size);
-  //memset(&src->big_flash_rect,0,sizeof(TextRect));
-
 
 }
 
@@ -914,35 +744,14 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
     src->height=height;
     src->fps=fps;
 
-    //src->history_textlines_y=0.37*src->height;
-    //src->history_textlines_ly=0.5*src->height;
-
     src->history_textlines_shift_y=0;
 
     src->all_context_nk=malloc(sizeof(struct nk_custom));
     memset(&src->all_context_nk->ogl.cmds,0,sizeof(src->all_context_nk->ogl.cmds));
 
-    //int MAX_MEMORY=10000000;
-
-
     nk_init_default(&src->all_context_nk->ctx, 0);
 
     src->all_context_nk->ctx.clip.userdata = nk_handle_ptr(0);
-
-/*
-    struct nk_font_config conf = nk_font_config(0);
-    conf.range = &nk_font_russian_glyph_ranges[0];
-
-//<<<<<<<<<<? free?
-    struct nk_font *src->font_small_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
-                              "/root/Desktop/distr/03.guis/glsoundbar/glsoundbar/glsoundbar/src/DroidSans.ttf", 16, &conf);
-//<<<<<<<<<<? free?
-*/
-
-    //GLint status;
-
-
-    //struct nk_sdl_device *dev = &src->all_context_nk->ogl;
 
     GError *error = NULL;
 
@@ -982,23 +791,19 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
         src->all_context_nk->ogl.vc = offsetof(struct nk_sdl_vertex, col);
 
     }
-    //glBindTexture(GL_TEXTURE_2D, 0);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    //nk_sdl_font_stash_begin(context, src, &src->all_context_nk->atlas);
     nk_font_atlas_init_default(&src->all_context_nk->atlas);
     nk_font_atlas_begin(&src->all_context_nk->atlas);
-
 
     const void *image;
 
     int font_w, font_h;
 
-
     struct nk_font_config conf = nk_font_config(0);
     conf.range = &nk_font_russian_glyph_ranges[0];
-
 
     int font_size;
 
@@ -1007,11 +812,7 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
     w=width;
     h=height;
 
-
-//<<<<<<<<<<? free?
-
-   // if(src->width>src->height){
-    font_size=calc_history_one_line_ly(src)/1.7;//*w/h*3.0/4.0;
+    font_size=calc_history_one_line_ly(src)/1.7;
     if(h*1.2>w)font_size*=w/h*3.0/4.0;
     if(font_size<5)font_size=5;
     src->font_small_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
@@ -1021,25 +822,10 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
 
 
     font_size=font_size*1.5;
-    //font_size=calc_bigtextline_ly(src)/2.0;//*w/h*3.0/4.0;
-    //if(h*1.2>w)font_size*=w/h*3.0/4.0;
-    //if(font_size<5)font_size=5;
     src->font_big_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
                               src->font_full_filename,
                               font_size, &conf);
 
-/*
-    font_size/=1.7;
-    src->font_medium_text_line = nk_font_atlas_add_from_file(&src->all_context_nk->atlas,
-                              src->font_full_filename,
-                              font_size, &conf);
-*/
-
-
-
-
-
-//<<<<<<<<<<? free?
 
     image = nk_font_atlas_bake(&src->all_context_nk->atlas, &font_w, &font_h, NK_FONT_ATLAS_RGBA32);
     glGenTextures(1, &src->all_context_nk->ogl.font_tex);
@@ -1055,127 +841,31 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src,
         nk_style_set_font(&src->all_context_nk->ctx, &src->all_context_nk->atlas.default_font->handle);
 
 
-    //int len1;
     nk_handle handle1;
     handle1.ptr=src->font_small_text_line;
-    //len1=nk_font_text_width(handle1,16,"asdfb",5);
 
-
-
-//<<<<<<<<<<<<<?
     src->all_context_nk->ctx.style.font = &src->font_small_text_line->handle;
     src->all_context_nk->ctx.stacks.fonts.head = 0;
-    //nk_style_set_font(&src->all_context_nk->ctx, &src->font_small_text_line->handle);
-//<<<<<<<<<<<<<?
 
-    //nk_buffer_init_fixed(&src->all_context_nk->vbuf, (void *)src->all_context_nk->vertices, (nk_size)MAX_VERTEX_MEMORY);
-    //nk_buffer_init_fixed(&src->all_context_nk->ebuf, (void *)src->all_context_nk->elements, (nk_size)MAX_ELEMENT_MEMORY);
+    glGenTextures(1, &src->dummy_texture);
 
+    glBindTexture(GL_TEXTURE_2D, src->dummy_texture);
 
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
-/*
-     gldraw_set_error_codes(src,0x01|0x02|0x04|0x10);
-     gldraw_set_error_codes(src,0x01|0x02);
-*/
+    glBindTexture(GL_TEXTURE_2D, 0);
 
+    src->gl_drawing_created=1;
 
+    calc_all_draw_sizes(src);
 
-     glGenTextures(1, &src->dummy_texture);
-
-     glBindTexture(GL_TEXTURE_2D, src->dummy_texture);
-
-     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-
-     glBindTexture(GL_TEXTURE_2D, 0);
-
-     src->gl_drawing_created=1;
-
-
-
-
-
-     calc_all_draw_sizes(src);
-
-     //if(src->error_codes_at_create>=0)
-     //gldraw_set_error_codes(src, 0x07);
-     //src->error_codes_at_create=-1;
-
-
-
-
-
-  return TRUE;
+    return TRUE;
 
 }
-
-
-
-/*
-  int errors_updated_flag;
-
-  int error_enabled_flag[SEVERITY_COUNT];
-
-  int    last_error_code;
-  double last_error_begin_time;
-
-  float small_textlines_x;
-  float small_textlines_y;
-  float small_textlines_ly;
-  float small_textlines_lx;
-  float small_textlines_num;
-
-  TextRect big_textline;
-  TextRect small_textlines[SEVERITY_COUNT];
-  TextRect big_flash_rect;
-*/
-
-
-/*
-typedef struct {
-
-    float x,y,lx,ly;
-
-    float border_thick;
-    //RGBA
-    float border_color[4];
-    int  border_blink_flag;
-
-    float background_color[4];
-    int  background_enabled_flag;//paint background or not
-
-    float text_x;
-    float text_y;
-    float text_ly;
-    float text_lx;
-    float text_color[4];
-    char text_line[text_line_size];
-
-    struct nk_font *selected_font_ptr;
-
-}TextRect
-
-
-typedef struct {
-
-   float text_color[4];
-   float border_color[4];
-   //0 = minimal weight - message weight
-   int weight;
-   int error_msg;
-   char *full_text;
-
-}ErrorProperties;
-
-
-;
-*/
-
-
-
 
 
 gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
@@ -1246,18 +936,12 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
     GLushort indices_quad[] = { 0, 1, 2, 0, 2, 3 };
 
-     //[[[[[[[[[[[[[
-
     ortho[0][0] /= (GLfloat)src->width;
     ortho[1][1] /= (GLfloat)src->height;
 
     glDisable(GL_BLEND);
-    //glEnable(GL_BLEND);
-    //glBlendEquation(GL_FUNC_ADD);
-    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
-    //glEnable(GL_SCISSOR_TEST);
     glActiveTexture(GL_TEXTURE0);
 
     if(gl->GenVertexArrays){
@@ -1276,7 +960,6 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     glVertexAttribPointer (src->all_context_nk->ogl.attrib_uv, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void *)(2*sizeof(float)));
     glVertexAttribPointer (src->all_context_nk->ogl.attrib_col, 4, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void *)(4*sizeof(float)));
 
-
     glBindTexture(GL_TEXTURE_2D, src->dummy_texture);
 
     gst_gl_shader_set_uniform_1f(src->shader, "height", src->height);
@@ -1285,12 +968,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     gst_gl_shader_set_uniform_1i(src->shader, "bg_fill_flag", 1);
     gst_gl_shader_set_uniform_4f(src->shader, "bg_color",src->color_background[1],src->color_background[2],src->color_background[3],src->color_background[0]);
 
-
-
     glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof (gushort), indices_quad, GL_STATIC_DRAW);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
-
 
     gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
     gl->BindBuffer (GL_ARRAY_BUFFER, 0);
@@ -1301,6 +981,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     gst_gl_context_clear_shader(context);
 
     glDisable(GL_BLEND);
+
 
 //-----------------------
 
@@ -1335,38 +1016,15 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
     src->all_context_nk->ctx.style.window=window_zero_padding;
 
-    //struct nk_rect bounds;
-
     src->all_context_nk->ctx.style.window.background=nk_rgba(0,0,0,0);
     src->all_context_nk->ctx.style.window.fixed_background.data.color=nk_rgba(0,0,0,0);
-
-    //nk_style_push_color(&src->all_context_nk->ctx,&src->all_context_nk->ctx.style.window.background,nk_rgba(0,0,0,0));
-
-
-    //nk_draw_list_path_rect_to
-    //nk_draw_list_path_arc_to_fast
-
 
     if (nk_begin(&src->all_context_nk->ctx, "Demo", nk_rect(0, 0, src->width, src->height),NK_WINDOW_NO_SCROLLBAR))
     {
 
-        //char buf[100];
-
-        //nk_layout_row_static(&src->all_context_nk->ctx, 15, 70, 1);sprintf(buf,"b=%d",test1);test1++;nk_button_label(&src->all_context_nk->ctx, buf);
-        //nk_layout_row_static(&src->all_context_nk->ctx, 20, 75, 1);sprintf(buf,"b=%d",test1);test1++;nk_button_label(&src->all_context_nk->ctx, buf);
-        //nk_layout_row_static(&src->all_context_nk->ctx, 20, 75, 1);sprintf(buf,"Русский",test1);test1++;nk_button_label(&src->all_context_nk->ctx, buf);
-
         struct nk_command_buffer *commands = nk_window_get_canvas(&src->all_context_nk->ctx);
 
         TextRect *tr;
-
-        //nk_layout_row_static(&src->all_context_nk->ctx, src->height, src->width, 1);
-
-
-        //nk_fill_rect(commands, nk_rect(src->big_textline.x,src->big_textline.y,src->big_textline.lx,src->all_text_lines_ly_percent*((float)src->height)), 0,
-        //             nk_rgba(src->color_background[1]+100, src->color_background[2]-100, src->color_background[3], src->color_background[0]));
-
-
 
         double cur_time=getCurrentTime();
 
@@ -1375,18 +1033,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         blink_flag=0;
         if(cur_time-floor(cur_time/src->time_big_rect_flash_delta)*src->time_big_rect_flash_delta<0.5*src->time_big_rect_flash_delta)blink_flag=1;
 
-        //if(cur_time-src->big_textline.error_capture_begin_time > src->time_big_text_capture_time &&
-        //   src->big_textline.show_time==0)blink_flag=1;
-
-
         tr=&src->big_flash_rect;
-        /*nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick, nk_rgba(
-                                                                      src->color_background[1]+100,
-                                                                      src->color_background[2]-100,
-                                                                      src->color_background[3],
-                                                                      src->color_background[0]
-                                                                                             ));
-                                                                                             */
 
         if(tr->displayedErrorData.flag_show_this==1){
           if(tr->displayedErrorData.flag_allow_rect_blink==1 && tr->displayedErrorData.flag_is_continuous==1){
@@ -1411,22 +1058,10 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         nk_layout_row_static(&src->all_context_nk->ctx,
                              floor(src->all_text_lines_begin_y_percent*((float)src->height)+calc_bigtextline_ly(src)),
                              src->width, 1);
-        //nk_layout_row_static(&src->all_context_nk->ctx, 0, src->width, 1);
 
         if (nk_group_begin(&src->all_context_nk->ctx, "Group0", NK_WINDOW_NO_SCROLLBAR)) {
 
-
-
             tr=&src->big_textline;
-/*
-            nk_fill_rect(commands, nk_rect(tr->x,tr->y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(
-                                                                      src->color_background[1]+100,
-                                                                      src->color_background[2]-100,
-                                                                      src->color_background[3],
-                                                                      src->color_background[0]
-                                                                                             ));
-*/
-
 
             if(tr->displayedErrorData.flag_show_this==1){
                 if(tr->background_enabled_flag==1)
@@ -1442,7 +1077,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                          tr->border_color[3]));
 
                 nk_draw_text(commands, nk_rect(tr->text_x,tr->text_y,tr->text_lx,tr->text_ly),
-                               tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle, //&src->font_big_text_line->handle,//src->font_small_text_line,
+                               tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1454,10 +1089,10 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
 
                 if(tr->displayedErrorData.flag_show_time==1 && tr->displayedErrorData.flag_is_continuous==1){
-                     //nk_draw_text(commands, nk_rect(tr->text_time_x,tr->text_time_y,tr->text_time_lx,tr->text_time_ly),
+
                      nk_draw_text(commands, nk_rect(tr->text_time_x_zone_end-tr->text_time_lx,tr->text_time_y,tr->text_time_lx,tr->text_time_ly),
 
-                               tr->text_time, strlen(tr->text_time), &tr->font_time_text_ptr->handle,//&src->font_big_text_line->handle,//src->font_small_text_line,
+                               tr->text_time, strlen(tr->text_time), &tr->font_time_text_ptr->handle,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1478,30 +1113,15 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         nk_layout_row_static(&src->all_context_nk->ctx,
                              floor(src->history_textlines_shift_y+src->all_text_lines_ly_percent*((float)src->height)-calc_bigtextline_ly(src))-2,
                              src->width, 1);
-        //nk_layout_row_static(&src->all_context_nk->ctx, src->height, src->width, 1);
-
 
         if (nk_group_begin(&src->all_context_nk->ctx, "Group1", NK_WINDOW_NO_SCROLLBAR)) {
-
-
-
-
 
 
             for(i=0;i<gldraw_get_history_errors_full_size(src);i++){
               tr=&src->history_textlines[i];
 
-
-
               if(tr->displayedErrorData.flag_show_this==1){
-/*
-                nk_fill_rect(commands, nk_rect(tr->x,tr->y-1+src->history_textlines_shift_y,tr->lx,tr->ly+2), 0, nk_rgba(
-                                                                      src->color_background[1]+100,
-                                                                      src->color_background[2]-100,
-                                                                      src->color_background[3],
-                                                                      src->color_background[0]
-                                                                                             ));
-*/
+
                   if(tr->background_enabled_flag==1)
                     nk_fill_rect(commands, nk_rect(tr->x,tr->y+src->history_textlines_shift_y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
                                                                                          tr->background_color[1],
@@ -1515,7 +1135,7 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
                                          tr->border_color[3]));
 
                   nk_draw_text(commands, nk_rect(tr->text_x,tr->text_y+src->history_textlines_shift_y,tr->text_lx+200,tr->text_ly),
-                               tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle,//&src->font_small_text_line->handle,//src->all_context_nk->ctx.style.font,
+                               tr->text_line, strlen(tr->text_line), &tr->fonts_ptrs[tr->fonts_ptr_selected]->handle,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1527,11 +1147,9 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
                 if(tr->displayedErrorData.flag_show_time==1 &&
                    tr->displayedErrorData.flag_is_continuous==1){
-                //if(tr->displayedErrorData.flag_show_time==1){
 
-                  //nk_draw_text(commands, nk_rect(tr->text_time_x,tr->text_time_y+src->history_textlines_shift_y,tr->text_time_lx,tr->text_time_ly),
                   nk_draw_text(commands, nk_rect(tr->text_time_x_zone_end-tr->text_time_lx,tr->text_time_y+src->history_textlines_shift_y,tr->text_time_lx,tr->text_time_ly),
-                               tr->text_time, strlen(tr->text_time), &tr->font_time_text_ptr->handle,//&src->font_small_text_line->handle,//src->font_small_text_line,
+                               tr->text_time, strlen(tr->text_time), &tr->font_time_text_ptr->handle,
                                nk_rgba(tr->background_color[0],
                                        tr->background_color[1],
                                        tr->background_color[2],
@@ -1547,29 +1165,12 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
             }
 
-
-
-
-
           nk_group_end(&src->all_context_nk->ctx);
         }
 
     }
     nk_end(&src->all_context_nk->ctx);
 
-
-    //struct nk_vec2 scale;
-/*
-    GLfloat ortho[4][4] = {
-        {2.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f,-2.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f,-1.0f, 0.0f},
-        {-1.0f,1.0f, 0.0f, 1.0f},
-    };
-
-    ortho[0][0] /= (GLfloat)src->width;
-    ortho[1][1] /= (GLfloat)src->height;
-*/
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1577,7 +1178,6 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
     glActiveTexture(GL_TEXTURE0);
-
 
     if(gl->GenVertexArrays){
       gl->BindVertexArray (src->all_context_nk->ogl.vao);
@@ -1602,83 +1202,64 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
     gst_gl_shader_set_uniform_1i(src->shader, "bg_fill_flag", 0);
     gst_gl_shader_set_uniform_4f(src->shader, "bg_color",src->color_background[1],src->color_background[2],src->color_background[3],src->color_background[0]);
 
-
     const struct nk_draw_command *cmd;
     const nk_draw_index *offset = NULL;
 
     {
-            // fill convert configuration
-            struct nk_convert_config config;
-            static const struct nk_draw_vertex_layout_element vertex_layout[] = {
-                {NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(struct nk_sdl_vertex, position)},
-                {NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(struct nk_sdl_vertex, uv)},
-                {NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(struct nk_sdl_vertex, col)},
-                {NK_VERTEX_LAYOUT_END}
-            };
+      // fill convert configuration
+      struct nk_convert_config config;
+      static const struct nk_draw_vertex_layout_element vertex_layout[] = {
+       {NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(struct nk_sdl_vertex, position)},
+       {NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(struct nk_sdl_vertex, uv)},
+       {NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(struct nk_sdl_vertex, col)},
+       {NK_VERTEX_LAYOUT_END}
+      };
 
-            //NK_MEMSET(&config, 0, sizeof(config));
-            memset(&config, 0, sizeof(config));
-            config.vertex_layout = vertex_layout;
-            config.vertex_size = sizeof(struct nk_sdl_vertex);
-            config.vertex_alignment = NK_ALIGNOF(struct nk_sdl_vertex);
-            config.null = src->all_context_nk->ogl.null;
-            config.circle_segment_count = 36;
-            config.curve_segment_count = 36;
-            config.arc_segment_count = 36;
-            config.global_alpha = 1.0f;
-            config.shape_AA = NK_ANTI_ALIASING_OFF;
-            config.line_AA = NK_ANTI_ALIASING_OFF;
+      memset(&config, 0, sizeof(config));
+      config.vertex_layout = vertex_layout;
+      config.vertex_size = sizeof(struct nk_sdl_vertex);
+      config.vertex_alignment = NK_ALIGNOF(struct nk_sdl_vertex);
+      config.null = src->all_context_nk->ogl.null;
+      config.circle_segment_count = 36;
+      config.curve_segment_count = 36;
+      config.arc_segment_count = 36;
+      config.global_alpha = 1.0f;
+      config.shape_AA = NK_ANTI_ALIASING_OFF;
+      config.line_AA = NK_ANTI_ALIASING_OFF;
 
-            // setup buffers to load vertices and elements
-            //{struct nk_buffer vbuf, ebuf;
-            //nk_buffer_init_fixed(&vbuf, (void *)src->all_context_nk->vertices, (nk_size)MAX_VERTEX_MEMORY);
-            //nk_buffer_init_fixed(&ebuf, (void *)src->all_context_nk->elements, (nk_size)MAX_ELEMENT_MEMORY);
+      nk_buffer_init_fixed(&src->all_context_nk->vbuf, (void *)src->all_context_nk->vertices, (nk_size)MAX_VERTEX_MEMORY);
+      nk_buffer_init_fixed(&src->all_context_nk->ebuf, (void *)src->all_context_nk->elements, (nk_size)MAX_ELEMENT_MEMORY);
 
-            nk_buffer_init_fixed(&src->all_context_nk->vbuf, (void *)src->all_context_nk->vertices, (nk_size)MAX_VERTEX_MEMORY);
-            nk_buffer_init_fixed(&src->all_context_nk->ebuf, (void *)src->all_context_nk->elements, (nk_size)MAX_ELEMENT_MEMORY);
-
-            //nk_buffer_init_default(&src->all_context_nk->vbuf);
-            //nk_buffer_init_default(&src->all_context_nk->ebuf);
-
-            nk_convert(&src->all_context_nk->ctx, &src->all_context_nk->ogl.cmds, &src->all_context_nk->vbuf, &src->all_context_nk->ebuf, &config);
-
-            //nk_buffer_free(&vbuf);
-            //nk_buffer_free(&ebuf);
-
-            //int a;
-            //a=0;
-
-            //}
+      nk_convert(&src->all_context_nk->ctx, &src->all_context_nk->ogl.cmds, &src->all_context_nk->vbuf, &src->all_context_nk->ebuf, &config);
 
     }
-
 
     glBufferData(GL_ARRAY_BUFFER, (size_t)src->all_context_nk->ctx.draw_list.vertices->memory.size,
                     src->all_context_nk->ctx.draw_list.vertices->memory.ptr, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, (size_t)src->all_context_nk->ctx.draw_list.elements->memory.size,
                    src->all_context_nk->ctx.draw_list.elements->memory.ptr, GL_STATIC_DRAW);
 
-    //scale.x = 1.0;//(float)display_width/(float)width;
-    //scale.y = 1.0;//(float)display_height/(float)height;
-
     // iterate over and execute each draw command
     nk_draw_foreach(cmd, &src->all_context_nk->ctx, &src->all_context_nk->ogl.cmds) {
-        if (!cmd->elem_count) continue;
-        glBindTexture(GL_TEXTURE_2D, (GLuint)cmd->texture.id);
-        err=glGetError();
 
-        GLint x,y,lx,ly;
-        x=(GLint)((cmd->clip_rect.x-1));
-        y=(GLint)((cmd->clip_rect.y-1));
-        lx=(GLint)((cmd->clip_rect.w+1));
-        ly=(GLint)((cmd->clip_rect.h+1));
+      if (!cmd->elem_count) continue;
+      glBindTexture(GL_TEXTURE_2D, (GLuint)cmd->texture.id);
+      err=glGetError();
 
-        glScissor(x,y,lx,ly);
+      GLint x,y,lx,ly;
+      x=(GLint)((cmd->clip_rect.x-1));
+      y=(GLint)((cmd->clip_rect.y-1));
+      lx=(GLint)((cmd->clip_rect.w+1));
+      ly=(GLint)((cmd->clip_rect.h+1));
 
-        glDrawElements(GL_TRIANGLES, (GLsizei)cmd->elem_count, GL_UNSIGNED_SHORT, offset);
-        err=glGetError();
-        offset += cmd->elem_count;
+      glScissor(x,y,lx,ly);
+
+      glDrawElements(GL_TRIANGLES, (GLsizei)cmd->elem_count, GL_UNSIGNED_SHORT, offset);
+      err=glGetError();
+      offset += cmd->elem_count;
+
     }
+
     nk_clear(&src->all_context_nk->ctx);
 
     gl->BindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1704,34 +1285,30 @@ void gldraw_close (GstGLContext * context, GlDrawing *src)
 
   const GstGLFuncs *gl = context->gl_vtable;
 
-
   if(src->all_context_nk!=NULL){
 
-      nk_font_atlas_clear(&src->all_context_nk->atlas);
-      nk_free(&src->all_context_nk->ctx);
+    nk_font_atlas_clear(&src->all_context_nk->atlas);
+    nk_free(&src->all_context_nk->ctx);
 
-      struct nk_sdl_device *dev = &src->all_context_nk->ogl;
+    struct nk_sdl_device *dev = &src->all_context_nk->ogl;
 
-      glDeleteTextures(1, &src->all_context_nk->ogl.font_tex);
-      glDeleteBuffers(1, &src->all_context_nk->ogl.vbo);
-      glDeleteBuffers(1, &src->all_context_nk->ogl.ebo);
-      gl->DeleteVertexArrays(1, &src->all_context_nk->ogl.vao);
-      nk_buffer_free(&src->all_context_nk->ogl.cmds);
+    glDeleteTextures(1, &src->all_context_nk->ogl.font_tex);
+    glDeleteBuffers(1, &src->all_context_nk->ogl.vbo);
+    glDeleteBuffers(1, &src->all_context_nk->ogl.ebo);
+    gl->DeleteVertexArrays(1, &src->all_context_nk->ogl.vao);
+    nk_buffer_free(&src->all_context_nk->ogl.cmds);
 
-      free(src->all_context_nk);
+    free(src->all_context_nk);
 
-      glDeleteTextures(1,&src->dummy_texture);
+    glDeleteTextures(1,&src->dummy_texture);
 
   }
   src->all_context_nk=NULL;
 
-
   if(src->shader!=NULL){
-      gst_object_unref(src->shader);
-      src->shader=NULL;
+    gst_object_unref(src->shader);
+    src->shader=NULL;
   }
-
-
 
   src->gl_drawing_created=0;
 

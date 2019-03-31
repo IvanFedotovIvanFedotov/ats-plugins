@@ -186,43 +186,13 @@ void print_all_fonts(){
 
   GstClock *pipeline_clock;
 
-  //int ready=0;
 
-
-//2 функции для фейкового пада через appsrc
-int want = 1;
 static void prepare_buffer(GstAppSrc* appsrc, InputError *input_errors, int input_errors_num) {
 
-  static gboolean white = FALSE;
-  static GstClockTime timestamp = 0;
-  GstBuffer *buffer;
-  guint size;
-  GstFlowReturn ret;
-
-  //if (!want) return;
-  //want = 0;
-
-  size = sizeof(InputError)*input_errors_num;
-
-  buffer = gst_buffer_new_wrapped_full( 0, (gpointer)input_errors, size, 0, size, NULL, NULL );
-
-  white = !white;
-
-  GST_BUFFER_PTS (buffer) = timestamp;
-  GST_BUFFER_DURATION (buffer) = gst_util_uint64_scale_int (1, GST_SECOND, 10);
-
-  timestamp += GST_BUFFER_DURATION (buffer);
-
-  ret = gst_app_src_push_buffer(appsrc, buffer);
-
-  if (ret != GST_FLOW_OK) {
-    /* something wrong, stop pushing */
-    // g_main_loop_quit (loop);
-  }
 }
+
 static void cb_need_data (GstElement *appsrc, guint unused_size, gpointer user_data) {
-  //prepare_buffer((GstAppSrc*)appsrc);
-  want = 1;
+
 }
 
 
@@ -235,9 +205,6 @@ static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_erro
   guint size;
   GstFlowReturn ret;
 
-  //if (!want) return;
-  //want = 0;
-
   size = sizeof(InputError)*input_errors_num;
 
   buffer1 = gst_buffer_new_wrapped_full( 0, (gpointer)input_errors, size, 0, size, NULL, NULL );
@@ -247,7 +214,6 @@ static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_erro
   buffer2 = gst_buffer_new_wrapped_full( 0, (gpointer)input_errors, size, 0, size, NULL, NULL );
   GST_BUFFER_PTS (buffer2) = timestamp;
   GST_BUFFER_DURATION (buffer2) = gst_util_uint64_scale_int (1, GST_SECOND, 10);
-
 
   timestamp += GST_BUFFER_DURATION (buffer1);
 
@@ -264,7 +230,6 @@ static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_erro
   ret=gst_pad_push(gldisplayerrors_sink_pad1, buffer1);
   ret=gst_pad_push(gldisplayerrors_sink_pad2, buffer2);
 
-  //ret = gst_app_src_push_buffer(appsrc, buffer);
 
   if (ret != GST_FLOW_OK) {
     /* something wrong, stop pushing */

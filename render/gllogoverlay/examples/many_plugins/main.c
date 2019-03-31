@@ -1,4 +1,7 @@
-/* USING 
+/* USING
+
+  Test draws many plugin instances. Restart plugins after 10 seconds.
+
 ./testfilterapp
 
 change:
