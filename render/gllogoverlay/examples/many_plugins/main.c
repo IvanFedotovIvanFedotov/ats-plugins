@@ -5,8 +5,8 @@
 ./testfilterapp
 
 change:
-  #define gldisplayerrors_arr_num 16   = all plugins num
-  #define gldisplayerrors_rows_num 4   = plugins per row
+  #define gllogoverlays_arr_num 16   = all plugins num
+  #define gllogoverlays_rows_num 4   = plugins per row
 
 */
 
@@ -26,7 +26,7 @@ change:
 
 #include <stdio.h>
 
-//#include "../gldisplayerrors/gldisplayerrors/gstgldisplayerrors.h"
+//#include "../gllogoverlays/gllogoverlays/gstgllogoverlays.h"
 
 
 
@@ -95,8 +95,8 @@ void print_all_fonts(){
 
 
 
-  #define gldisplayerrors_arr_num 16
-  #define gldisplayerrors_rows_num 4
+  #define gllogoverlays_arr_num 16
+  #define gllogoverlays_rows_num 4
 
 
   int thread1_loops=0;
@@ -119,19 +119,19 @@ void print_all_fonts(){
              *autoaudiosink,
              *autovideosink,
 
-             *wavescope_arr[gldisplayerrors_arr_num],
-             *gltestsrc_arr[gldisplayerrors_arr_num],
-             *audiotestsrc_arr[gldisplayerrors_arr_num],
-             *glsoundbar_arr[gldisplayerrors_arr_num],
-             *gltransformation_arr[gldisplayerrors_arr_num],
+             *wavescope_arr[gllogoverlays_arr_num],
+             *gltestsrc_arr[gllogoverlays_arr_num],
+             *audiotestsrc_arr[gllogoverlays_arr_num],
+             *glsoundbar_arr[gllogoverlays_arr_num],
+             *gltransformation_arr[gllogoverlays_arr_num],
 
-             *avenc_mp2_arr[gldisplayerrors_arr_num],
-             *avdec_mp2_arr[gldisplayerrors_arr_num],
-             *decodebin_arr[gldisplayerrors_arr_num],
-             *queue_arr[gldisplayerrors_arr_num],
-             *audioconvert_arr[gldisplayerrors_arr_num],
-             *filtercaps_audioconvert_arr[gldisplayerrors_arr_num],
-             //*filtercaps_audiotestsrc_arr[gldisplayerrors_arr_num],
+             *avenc_mp2_arr[gllogoverlays_arr_num],
+             *avdec_mp2_arr[gllogoverlays_arr_num],
+             *decodebin_arr[gllogoverlays_arr_num],
+             *queue_arr[gllogoverlays_arr_num],
+             *audioconvert_arr[gllogoverlays_arr_num],
+             *filtercaps_audioconvert_arr[gllogoverlays_arr_num],
+             //*filtercaps_audiotestsrc_arr[gllogoverlays_arr_num],
 
              *avenc_mp2,
              *avdec_mp2,
@@ -150,17 +150,17 @@ void print_all_fonts(){
 
              ;
 
-  GstPad *gldisplayerrors_sink_pad1=NULL;
-  GstPad *gldisplayerrors_sink_pad2=NULL;
+  GstPad *gllogoverlays_sink_pad1=NULL;
+  GstPad *gllogoverlays_sink_pad2=NULL;
 
   int video_file_index=0;
 
 
-  GstElement *gldisplayerrors[gldisplayerrors_arr_num],
-             *appsrc[gldisplayerrors_arr_num];
+  GstElement *gllogoverlays[gllogoverlays_arr_num],
+             *appsrc[gllogoverlays_arr_num];
 
-  GstCaps    *filtercaps_gldisplayerrors_caps_arr[gldisplayerrors_arr_num];
-  GstElement *filtercaps_gldisplayerrors_arr[gldisplayerrors_arr_num];
+  GstCaps    *filtercaps_gllogoverlays_caps_arr[gllogoverlays_arr_num];
+  GstElement *filtercaps_gllogoverlays_arr[gllogoverlays_arr_num];
 
   GstCaps    *filtercaps_caps_mix;
   GstElement *filtercaps_mix;
@@ -236,7 +236,7 @@ static void cb_need_data (GstElement *appsrc, guint unused_size, gpointer user_d
 
 
 
-static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_errors_num) {
+static void push_buf_to_gllogoverlays(InputError *input_errors, int input_errors_num) {
 
 
   static GstClockTime timestamp = 0;
@@ -252,7 +252,7 @@ static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_erro
 
   size = sizeof(InputError)*input_errors_num;
 
-  for(i=0;i<gldisplayerrors_arr_num;i++){
+  for(i=0;i<gllogoverlays_arr_num;i++){
     sprintf(str1,"src", i);
     pad=gst_element_get_static_pad(appsrc[i],str1);
 
@@ -323,11 +323,11 @@ void *thread_function1(void *data){
 
        sort_selector=0;
 
-       //g_object_set(gldisplayerrors,"set-history-size",10,NULL);
-       //g_object_set(gldisplayerrors,"sort",1,NULL);
+       //g_object_set(gllogoverlays,"set-history-size",10,NULL);
+       //g_object_set(gllogoverlays,"sort",1,NULL);
 
-       //g_object_set(gldisplayerrors,"text-color-argb",0xffff0000,NULL);
-       //g_object_set(gldisplayerrors,"bg-color-argb",0xff00ff00,NULL);
+       //g_object_set(gllogoverlays,"text-color-argb",0xffff0000,NULL);
+       //g_object_set(gllogoverlays,"bg-color-argb",0xff00ff00,NULL);
 
        if(test_selector==1){
 
@@ -350,7 +350,7 @@ void *thread_function1(void *data){
              input_errors[0].delta_lasting=1000000000;
              strcpy(input_errors[0].msg,"3.Редкая ошибка.");
 
-             push_buf_to_gldisplayerrors(input_errors, 1);
+             push_buf_to_gllogoverlays(input_errors, 1);
            }
 
 
@@ -417,7 +417,7 @@ void *thread_function1(void *data){
            input_errors[0].delta_lasting=1000000000;
            strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
 
-           //push_buf_to_gldisplayerrors(&input_errors[1], 1);
+           //push_buf_to_gllogoverlays(&input_errors[1], 1);
 
            input_errors[1].severity=2;
            input_errors[1].source=2;
@@ -426,15 +426,15 @@ void *thread_function1(void *data){
            input_errors[1].delta_lasting=1000000000;
            strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
 
-           //push_buf_to_gldisplayerrors(&input_errors[2], 1);
+           //push_buf_to_gllogoverlays(&input_errors[2], 1);
 
-           push_buf_to_gldisplayerrors(input_errors, 2);
+           push_buf_to_gllogoverlays(input_errors, 2);
 
            //sorts switch test:
            if((test_counter % 30) == 15){
-             //g_object_set(gldisplayerrors,"set-history-size",(sort_selector+1)*5,NULL);
-             //g_object_set(gldisplayerrors,"clear",0,NULL);
-             //g_object_set(gldisplayerrors,"sort",1-sort_selector,NULL);
+             //g_object_set(gllogoverlays,"set-history-size",(sort_selector+1)*5,NULL);
+             //g_object_set(gllogoverlays,"clear",0,NULL);
+             //g_object_set(gllogoverlays,"sort",1-sort_selector,NULL);
              sort_selector++;
              if(sort_selector>1)sort_selector=0;
 
@@ -677,14 +677,14 @@ gint pipeline_test (gint argc, gchar *argv[])
 
 /*
 
-      //g_object_set(gldisplayerrors,"set-errors",0x07,NULL);
+      //g_object_set(gllogoverlays,"set-errors",0x07,NULL);
 
-      g_object_set(gldisplayerrors,"font-caption","Noto Serif Display",NULL);
-      //g_object_set(gldisplayerrors,"font-style","Italic",NULL);
-      //g_object_set(gldisplayerrors,"font-style","Regular",NULL);
-      g_object_set(gldisplayerrors,"font-style","Bold",NULL);
-      //g_object_set(gldisplayerrors,"set-history-size",5,NULL);
-      //g_object_set(gldisplayerrors,"sort",0,NULL);
+      g_object_set(gllogoverlays,"font-caption","Noto Serif Display",NULL);
+      //g_object_set(gllogoverlays,"font-style","Italic",NULL);
+      //g_object_set(gllogoverlays,"font-style","Regular",NULL);
+      g_object_set(gllogoverlays,"font-style","Bold",NULL);
+      //g_object_set(gllogoverlays,"set-history-size",5,NULL);
+      //g_object_set(gllogoverlays,"sort",0,NULL);
 
       g_object_set (G_OBJECT (appsrc),
 		"stream-type", 0, // GST_APP_STREAM_TYPE_STREAM
@@ -699,7 +699,7 @@ gint pipeline_test (gint argc, gchar *argv[])
         NULL);
 
 
-      //gldisplayerrors_sink_pad=gst_element_get_static_pad(gldisplayerrors,"sink");
+      //gllogoverlays_sink_pad=gst_element_get_static_pad(gllogoverlays,"sink");
 
       //g_signal_connect (appsrc, "need-data", G_CALLBACK (cb_need_data), NULL);
 */
@@ -712,11 +712,11 @@ gint pipeline_test (gint argc, gchar *argv[])
 
 
 /*
-  GstElement *gldisplayerrors[gldisplayerrors_arr_num],
-             *appsrc[gldisplayerrors_arr_num],
+  GstElement *gllogoverlays[gllogoverlays_arr_num],
+             *appsrc[gllogoverlays_arr_num],
 
-  GstCaps    *filtercaps_gldisplayerrors_caps_arr[gldisplayerrors_arr_num];
-  GstElement *filtercaps_gldisplayerrors_arr[gldisplayerrors_arr_num];
+  GstCaps    *filtercaps_gllogoverlays_caps_arr[gllogoverlays_arr_num];
+  GstElement *filtercaps_gllogoverlays_arr[gllogoverlays_arr_num];
 
   GstCaps    *filtercaps_caps_mix;
   GstElement *filtercaps_mix;
@@ -727,17 +727,17 @@ gint pipeline_test (gint argc, gchar *argv[])
 
      w=1424;
      h=868;
-     wm=w/(gldisplayerrors_arr_num/gldisplayerrors_rows_num);
-     hm=h/gldisplayerrors_rows_num;
+     wm=w/(gllogoverlays_arr_num/gllogoverlays_rows_num);
+     hm=h/gllogoverlays_rows_num;
 
 
-     for(i=0;i<gldisplayerrors_arr_num;i++){
+     for(i=0;i<gllogoverlays_arr_num;i++){
 
       sprintf(str1,"_appsrc_%d",i);
       appsrc[i]=gst_element_factory_make ("appsrc", str1);
 
-      sprintf(str1,"_gldisplayerrors_%d",i);
-      gldisplayerrors[i]=gst_element_factory_make ("gldisplayerrors", str1);
+      sprintf(str1,"_gllogoverlay_%d",i);
+      gllogoverlays[i]=gst_element_factory_make ("gllogoverlay", str1);
 
       sprintf(buf1,"video/x-raw(memory:GLMemory),"
                    "format=(string)RGBA,"
@@ -745,11 +745,11 @@ gint pipeline_test (gint argc, gchar *argv[])
                    "height=(int)%d,"
                    "framerate=(fraction)25/1,"
                    "texture-target=(string)2D",wm,hm);
-      sprintf(str1,"_filtercaps_gldisplayerrors_arr_%d",i);
-      filtercaps_gldisplayerrors_arr[i] = gst_element_factory_make("capsfilter",str1);
-      filtercaps_gldisplayerrors_caps_arr[i] = gst_caps_from_string(buf1);
-      g_object_set (G_OBJECT (filtercaps_gldisplayerrors_arr[i]), "caps", filtercaps_gldisplayerrors_caps_arr[i], NULL);
-      gst_caps_unref (filtercaps_gldisplayerrors_caps_arr[i]);
+      sprintf(str1,"_filtercaps_gllogoverlays_arr_%d",i);
+      filtercaps_gllogoverlays_arr[i] = gst_element_factory_make("capsfilter",str1);
+      filtercaps_gllogoverlays_caps_arr[i] = gst_caps_from_string(buf1);
+      g_object_set (G_OBJECT (filtercaps_gllogoverlays_arr[i]), "caps", filtercaps_gllogoverlays_caps_arr[i], NULL);
+      gst_caps_unref (filtercaps_gllogoverlays_caps_arr[i]);
 
      }
 
@@ -767,35 +767,35 @@ gint pipeline_test (gint argc, gchar *argv[])
       glvideomixer = gst_element_factory_make ("glvideomixer", "_glvideomixer_");
       glimagesink  = gst_element_factory_make ("glimagesink", "_glimagesink_");
 
-      for(i=0;i<gldisplayerrors_arr_num;i++){
-        if(!appsrc[i] || !gldisplayerrors[i] ||
+      for(i=0;i<gllogoverlays_arr_num;i++){
+        if(!appsrc[i] || !gllogoverlays[i] ||
            !glvideomixer || !glimagesink){
           g_print ("Error init\n");
           return -1;
         }
       }
 
-      for(i=0;i<gldisplayerrors_arr_num;i++){
+      for(i=0;i<gllogoverlays_arr_num;i++){
         gst_bin_add(GST_BIN (pipeline),appsrc[i]);
-        gst_bin_add(GST_BIN (pipeline),gldisplayerrors[i]);
-        gst_bin_add(GST_BIN (pipeline),filtercaps_gldisplayerrors_arr[i]);
+        gst_bin_add(GST_BIN (pipeline),gllogoverlays[i]);
+        gst_bin_add(GST_BIN (pipeline),filtercaps_gllogoverlays_arr[i]);
       }
       gst_bin_add(GST_BIN (pipeline),filtercaps_mix);
       gst_bin_add(GST_BIN (pipeline),glvideomixer);
       gst_bin_add(GST_BIN (pipeline),glimagesink);
 
-      for(i=0;i<gldisplayerrors_arr_num;i++){
-        gst_element_link_many(appsrc[i],gldisplayerrors[i],filtercaps_gldisplayerrors_arr[i],glvideomixer,NULL);
+      for(i=0;i<gllogoverlays_arr_num;i++){
+        gst_element_link_many(appsrc[i],gllogoverlays[i],filtercaps_gllogoverlays_arr[i],glvideomixer,NULL);
       }
 
       gst_element_link_many(glvideomixer, filtercaps_mix, glimagesink);
 
-      //gldisplayerrors_arr_num/gldisplayerrors_rows_num
-      for(i=0;i<gldisplayerrors_arr_num;i++){
+      //gllogoverlays_arr_num/gllogoverlays_rows_num
+      for(i=0;i<gllogoverlays_arr_num;i++){
         sprintf(str1,"sink_%d", i);
         pad=gst_element_get_static_pad(glvideomixer,str1);
-        g_object_set(pad,"xpos", (i % (gldisplayerrors_arr_num / gldisplayerrors_rows_num)) * wm,NULL);
-        g_object_set(pad,"ypos",( gldisplayerrors_rows_num * i / gldisplayerrors_arr_num) * hm, NULL);
+        g_object_set(pad,"xpos", (i % (gllogoverlays_arr_num /gllogoverlays_rows_num)) * wm,NULL);
+        g_object_set(pad,"ypos",(gllogoverlays_rows_num * i /gllogoverlays_arr_num) * hm, NULL);
         g_object_set(pad,"width",wm,NULL);
         g_object_set(pad,"height",hm,NULL);
         gst_object_unref(pad);

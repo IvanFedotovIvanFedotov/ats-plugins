@@ -23,7 +23,7 @@ print font list:
 
 #include <stdio.h>
 
-//#include "../gldisplayerrors/gldisplayerrors/gstgldisplayerrors.h"
+//#include "../gllogoverlay/gllogoverlay/gstgllogoverlay.h"
 
 #define arr_size 16
 
@@ -98,8 +98,8 @@ void print_all_fonts(){
   GstStateChangeReturn ret;
   GstElement *pipeline;
   GstElement *gltestsrc, *gltestsrc2, *glsoundbar, *glsoundbar2, *glimagesink,
-             *gldisplayerrors,
-             *gldisplayerrors2,
+             *gllogoverlay,
+             *gllogoverlay2,
              *audiotestsrc, *audiotestsrc2, *alsasink, *wavescope, *wavescope2, *glvideomixer,
              *gltransformation, *gltransformation2,
              *filesrc, *qtdemux, *parser, *faad,
@@ -147,8 +147,8 @@ void print_all_fonts(){
 
              ;
 
-  GstPad *gldisplayerrors_sink_pad1=NULL;
-  GstPad *gldisplayerrors_sink_pad2=NULL;
+  GstPad *gllogoverlay_sink_pad1=NULL;
+  GstPad *gllogoverlay_sink_pad2=NULL;
 
   int video_file_index=0;
 
@@ -197,7 +197,7 @@ static void cb_need_data (GstElement *appsrc, guint unused_size, gpointer user_d
 
 
 
-static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_errors_num) {
+static void push_buf_to_gllogoverlay(InputError *input_errors, int input_errors_num) {
 
 
   static GstClockTime timestamp = 0;
@@ -218,17 +218,17 @@ static void push_buf_to_gldisplayerrors(InputError *input_errors, int input_erro
   timestamp += GST_BUFFER_DURATION (buffer1);
 
 
-  if(gldisplayerrors_sink_pad1==NULL){
-    gldisplayerrors_sink_pad1=gst_element_get_static_pad(appsrc,"src");
+  if(gllogoverlay_sink_pad1==NULL){
+    gllogoverlay_sink_pad1=gst_element_get_static_pad(appsrc,"src");
   }
 
-  if(gldisplayerrors_sink_pad2==NULL){
-    gldisplayerrors_sink_pad2=gst_element_get_static_pad(appsrc2,"src");
+  if(gllogoverlay_sink_pad2==NULL){
+    gllogoverlay_sink_pad2=gst_element_get_static_pad(appsrc2,"src");
   }
 
 
-  ret=gst_pad_push(gldisplayerrors_sink_pad1, buffer1);
-  ret=gst_pad_push(gldisplayerrors_sink_pad2, buffer2);
+  ret=gst_pad_push(gllogoverlay_sink_pad1, buffer1);
+  ret=gst_pad_push(gllogoverlay_sink_pad2, buffer2);
 
 
   if (ret != GST_FLOW_OK) {
@@ -288,11 +288,11 @@ void *thread_function1(void *data){
 
        sort_selector=0;
 
-       g_object_set(gldisplayerrors,"set-history-size",10,NULL);
-       //g_object_set(gldisplayerrors,"sort",1,NULL);
+       g_object_set(gllogoverlay,"set-history-size",10,NULL);
+       //g_object_set(gllogoverlay,"sort",1,NULL);
 
-       //g_object_set(gldisplayerrors,"text-color-argb",0xffff0000,NULL);
-       //g_object_set(gldisplayerrors,"bg-color-argb",0xff00ff00,NULL);
+       //g_object_set(gllogoverlay,"text-color-argb",0xffff0000,NULL);
+       //g_object_set(gllogoverlay,"bg-color-argb",0xff00ff00,NULL);
 
        if(test_selector==1){
 
@@ -315,7 +315,7 @@ void *thread_function1(void *data){
              input_errors[0].delta_lasting=1000000000;
              strcpy(input_errors[0].msg,"3.Редкая ошибка.");
 
-             push_buf_to_gldisplayerrors(input_errors, 1);
+             push_buf_to_gllogoverlay(input_errors, 1);
            }
 
 
@@ -380,7 +380,7 @@ void *thread_function1(void *data){
            input_errors[0].delta_lasting=1000000000;
            strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
 
-           //push_buf_to_gldisplayerrors(&input_errors[1], 1);
+           //push_buf_to_gllogoverlay(&input_errors[1], 1);
 
            input_errors[1].severity=2;
            input_errors[1].source=2;
@@ -389,15 +389,15 @@ void *thread_function1(void *data){
            input_errors[1].delta_lasting=1000000000;
            strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
 
-           //push_buf_to_gldisplayerrors(&input_errors[2], 1);
+           //push_buf_to_gllogoverlay(&input_errors[2], 1);
 
-           push_buf_to_gldisplayerrors(input_errors, 2);
+           push_buf_to_gllogoverlay(input_errors, 2);
 
            //sorts switch test:
            if((test_counter % 30) == 15){
-             //g_object_set(gldisplayerrors,"set-history-size",(sort_selector+1)*5,NULL);
-             //g_object_set(gldisplayerrors,"clear",0,NULL);
-             //g_object_set(gldisplayerrors,"sort",1-sort_selector,NULL);
+             //g_object_set(gllogoverlay,"set-history-size",(sort_selector+1)*5,NULL);
+             //g_object_set(gllogoverlay,"clear",0,NULL);
+             //g_object_set(gllogoverlay,"sort",1-sort_selector,NULL);
              sort_selector++;
              if(sort_selector>1)sort_selector=0;
 
@@ -460,15 +460,15 @@ void *thread_function1(void *data){
              strcpy(input_errors[3].msg,"4.Редкая ошибка.");
 
 
-             push_buf_to_gldisplayerrors(input_errors, 4);
+             push_buf_to_gllogoverlay(input_errors, 4);
            }
 
 /*
            //sorts switch test:
            if((test_counter % 20) == 10){
-             //g_object_set(gldisplayerrors,"set-history-size",3,NULL);
-             g_object_set(gldisplayerrors,"clear",0,NULL);
-             //g_object_set(gldisplayerrors,"sort",sort_selector,NULL);
+             //g_object_set(gllogoverlay,"set-history-size",3,NULL);
+             g_object_set(gllogoverlay,"clear",0,NULL);
+             //g_object_set(gllogoverlay,"sort",sort_selector,NULL);
              sort_selector++;
              if(sort_selector>1)sort_selector=0;
 
@@ -482,7 +482,7 @@ void *thread_function1(void *data){
              input_errors[0].delta_lasting=1000000000;
              strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
 
-             //push_buf_to_gldisplayerrors(&input_errors[1], 1);
+             //push_buf_to_gllogoverlay(&input_errors[1], 1);
 
              input_errors[1].severity=2;
              input_errors[1].source=2;
@@ -492,9 +492,9 @@ void *thread_function1(void *data){
              strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
 
 
-             //push_buf_to_gldisplayerrors(&input_errors[2], 1);
+             //push_buf_to_gllogoverlay(&input_errors[2], 1);
 
-             push_buf_to_gldisplayerrors(input_errors, 2);
+             push_buf_to_gllogoverlay(input_errors, 2);
 
 
              test_counter++;
@@ -543,15 +543,15 @@ void *thread_function1(void *data){
              input_errors[2].delta_lasting=1000000000;
              strcpy(input_errors[2].msg,"3.Приоритет.");
 
-             push_buf_to_gldisplayerrors(input_errors, 3);
+             push_buf_to_gllogoverlay(input_errors, 3);
            }
 
            /*
            //sorts switch test:
            if((test_counter % 10) == 8){
-             //g_object_set(gldisplayerrors,"set-history-size",3,NULL);
-             //g_object_set(gldisplayerrors,"clear",0,NULL);
-             g_object_set(gldisplayerrors,"sort",sort_selector,NULL);
+             //g_object_set(gllogoverlay,"set-history-size",3,NULL);
+             //g_object_set(gllogoverlay,"clear",0,NULL);
+             g_object_set(gllogoverlay,"sort",sort_selector,NULL);
              sort_selector++;
              if(sort_selector>1)sort_selector=0;
 
@@ -566,7 +566,7 @@ void *thread_function1(void *data){
              input_errors[0].delta_lasting=1000000000;
              strcpy(input_errors[0].msg,"1.Ошибка 1. Длинная фраза с текстом для проверки обрезки.");
 
-             //push_buf_to_gldisplayerrors(&input_errors[1], 1);
+             //push_buf_to_gllogoverlay(&input_errors[1], 1);
 
              input_errors[1].severity=2;
              input_errors[1].source=2;
@@ -576,9 +576,9 @@ void *thread_function1(void *data){
              strcpy(input_errors[1].msg,"2.Ошибка 2. Длинная фраза с текстом для проверки обрезки.");
 
 
-             //push_buf_to_gldisplayerrors(&input_errors[2], 1);
+             //push_buf_to_gllogoverlay(&input_errors[2], 1);
 
-             push_buf_to_gldisplayerrors(input_errors, 2);
+             push_buf_to_gllogoverlay(input_errors, 2);
            */
 
 
@@ -808,8 +808,8 @@ gint pipeline_test (gint argc, gchar *argv[])
       appsrc = gst_element_factory_make("appsrc", "_appsrc_");
       appsrc2 = gst_element_factory_make("appsrc", "_appsrc2_");
 
-      gldisplayerrors = gst_element_factory_make("gldisplayerrors", "_gldisplayerrors_");
-      gldisplayerrors2 = gst_element_factory_make("gldisplayerrors", "_gldisplayerrors2_");
+      gllogoverlay = gst_element_factory_make("gllogoverlay", "_gllogoverlay_");
+      gllogoverlay2 = gst_element_factory_make("gllogoverlay", "_gllogoverlay2_");
 
       glvideomixer = gst_element_factory_make ("glvideomixer", "_glvideomixer_");
       glimagesink  = gst_element_factory_make ("glimagesink", "_glimagesink_");
@@ -867,7 +867,7 @@ gint pipeline_test (gint argc, gchar *argv[])
 
 
 
-      if (!gldisplayerrors
+      if (!gllogoverlay
           || !glvideomixer
           || !glimagesink
           ) {
@@ -882,7 +882,7 @@ gint pipeline_test (gint argc, gchar *argv[])
       gst_bin_add_many (GST_BIN (pipeline),
 
         appsrc,
-        gldisplayerrors,
+        gllogoverlay,
         filtercaps1,
 
         glvideomixer,
@@ -893,14 +893,14 @@ gint pipeline_test (gint argc, gchar *argv[])
         filtercaps3,
 
         appsrc2,
-        gldisplayerrors2,
+        gllogoverlay2,
         filtercaps2,
 
         NULL);
 
       gst_element_link_many(
         appsrc,
-        gldisplayerrors,
+        gllogoverlay,
         filtercaps1,
         glvideomixer,
         NULL);
@@ -913,7 +913,7 @@ gint pipeline_test (gint argc, gchar *argv[])
 
       gst_element_link_many(
         appsrc2,
-        gldisplayerrors2,
+        gllogoverlay2,
         filtercaps2,
         glvideomixer,
         NULL);
@@ -945,14 +945,14 @@ gint pipeline_test (gint argc, gchar *argv[])
       g_object_set(pad,"height",h/2,NULL);
 
 
-      //g_object_set(gldisplayerrors,"set-errors",0x07,NULL);
+      //g_object_set(gllogoverlay,"set-errors",0x07,NULL);
 
-      g_object_set(gldisplayerrors,"font-caption","Noto Serif Display",NULL);
-      //g_object_set(gldisplayerrors,"font-style","Italic",NULL);
-      //g_object_set(gldisplayerrors,"font-style","Regular",NULL);
-      g_object_set(gldisplayerrors,"font-style","Bold",NULL);
-      //g_object_set(gldisplayerrors,"set-history-size",5,NULL);
-      //g_object_set(gldisplayerrors,"sort",0,NULL);
+      g_object_set(gllogoverlay,"font-caption","Noto Serif Display",NULL);
+      //g_object_set(gllogoverlay,"font-style","Italic",NULL);
+      //g_object_set(gllogoverlay,"font-style","Regular",NULL);
+      g_object_set(gllogoverlay,"font-style","Bold",NULL);
+      //g_object_set(gllogoverlay,"set-history-size",5,NULL);
+      //g_object_set(gllogoverlay,"sort",0,NULL);
 
       g_object_set (G_OBJECT (appsrc),
 		"stream-type", 0, // GST_APP_STREAM_TYPE_STREAM
@@ -967,7 +967,7 @@ gint pipeline_test (gint argc, gchar *argv[])
         NULL);
 
 
-      //gldisplayerrors_sink_pad=gst_element_get_static_pad(gldisplayerrors,"sink");
+      //gllogoverlay_sink_pad=gst_element_get_static_pad(gllogoverlay,"sink");
 
       //g_signal_connect (appsrc, "need-data", G_CALLBACK (cb_need_data), NULL);
 
