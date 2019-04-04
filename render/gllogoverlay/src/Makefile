@@ -14,11 +14,11 @@ clean: create_build_dir clean_build_dir
 install: clean build copy_lib_to_pluginsdir
 
 
-build: gstgldisplayerrors.o gldrawing.o errorshandler.o
-	@$(CC) $(LDFLAGS) ../build/gstgldisplayerrors.o ../build/gldrawing.o ../build/errorshandler.o -o ../build/libgstgldisplayerrors.so
+build: gstgllogoverlay.o gldrawing.o errorshandler.o
+	@$(CC) $(LDFLAGS) ../build/gstgllogoverlay.o ../build/gldrawing.o ../build/errorshandler.o -o ../build/libgstgllogoverlay.so
 
-gstgldisplayerrors.o:
-	@$(CC) $(CFLAGS) gstgldisplayerrors.c -o ../build/gstgldisplayerrors.o
+gstgllogoverlay.o:
+	@$(CC) $(CFLAGS) gstgllogoverlay.c -o ../build/gstgllogoverlay.o
 
 gldrawing.o:
 	@$(CC) $(CFLAGS) gldrawing.c -o ../build/gldrawing.o
@@ -29,12 +29,12 @@ errorshandler.o:
 create_build_dir: 
 	mkdir -p ../build
 clean_build_dir:
-	rm -f ../build/gstgldisplayerrors.o
+	rm -f ../build/gstgllogoverlay.o
 	rm -f ../build/gldrawing.o
 	rm -f ../build/errorshandler.o
-	rm -f ../build/libgstgldisplayerrors.so
+	rm -f ../build/libgstgllogoverlay.so
 
 copy_lib_to_pluginsdir:
-	yes | cp -rf ../build/libgstgldisplayerrors.so $(PLUGINS_INSTALL_DIR)
+	yes | cp -rf ../build/libgstgllogoverlay.so $(PLUGINS_INSTALL_DIR)
 
 

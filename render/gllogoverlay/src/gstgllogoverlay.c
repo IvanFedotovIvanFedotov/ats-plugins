@@ -22,17 +22,17 @@
  */
 
 /**
- * SECTION:element-gldisplayerrors
- * @title: gldisplayerrors
+ * SECTION:element-gllogoverlay
+ * @title: gllogoverlay
  *
- * The gldisplayerrors element is used to produce test video texture.
+ * The gllogoverlay element is used to produce test video texture.
  * The video test produced can be controlled with the "pattern"
  * property.
  *
  * ## Example launch line
  *
  * |[
- * gst-launch-1.0 -v gldisplayerrors pattern=smpte ! glimagesink
+ * gst-launch-1.0 -v gllogoverlay pattern=smpte ! glimagesink
  * ]|
  * Shows original SMPTE color bars in a window.
  *
@@ -45,13 +45,13 @@
 #include "gst/gl/gstglfuncs.h"
 #include "gst/gst-i18n-plugin.h"
 
-#include "gstgldisplayerrors.h"
+#include "gstgllogoverlay.h"
 
 #define USE_PEER_BUFFERALLOC
 #define SUPPORTED_GL_APIS (GST_GL_API_OPENGL | GST_GL_API_OPENGL3 | GST_GL_API_GLES2)
 
-GST_DEBUG_CATEGORY_STATIC (gl_dispaly_errors_debug);
-#define GST_CAT_DEFAULT gl_dispaly_errors_debug
+GST_DEBUG_CATEGORY_STATIC (gl_log_overlay_debug);
+#define GST_CAT_DEFAULT gl_log_overlay_debug
 
 enum
 {
@@ -80,46 +80,46 @@ static GstStaticPadTemplate src_factory = GST_STATIC_PAD_TEMPLATE ("src",
     );
 /* *INDENT-ON* */
 
-#define gst_gl_dispaly_errors_parent_class parent_class
-G_DEFINE_TYPE (GstGLDisplayErrors, gst_gl_dispaly_errors, GST_TYPE_PUSH_SRC);
+#define gst_gl_log_overlay_parent_class parent_class
+G_DEFINE_TYPE (GstGLLogOverlay, gst_gl_log_overlay, GST_TYPE_PUSH_SRC);
 
-static void gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
+static void gst_gl_log_overlay_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
-static void gst_gl_dispaly_errors_get_property (GObject * object, guint prop_id,
+static void gst_gl_log_overlay_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-static gboolean gst_gl_dispaly_errors_setcaps (GstBaseSrc * bsrc, GstCaps * caps);
-static GstCaps *gst_gl_dispaly_errors_fixate (GstBaseSrc * bsrc, GstCaps * caps);
+static gboolean gst_gl_log_overlay_setcaps (GstBaseSrc * bsrc, GstCaps * caps);
+static GstCaps *gst_gl_log_overlay_fixate (GstBaseSrc * bsrc, GstCaps * caps);
 
-static gboolean gst_gl_dispaly_errors_is_seekable (GstBaseSrc * psrc);
-static gboolean gst_gl_dispaly_errors_do_seek (GstBaseSrc * bsrc,
+static gboolean gst_gl_log_overlay_is_seekable (GstBaseSrc * psrc);
+static gboolean gst_gl_log_overlay_do_seek (GstBaseSrc * bsrc,
     GstSegment * segment);
-static gboolean gst_gl_dispaly_errors_query (GstBaseSrc * bsrc, GstQuery * query);
-static void gst_gl_dispaly_errors_set_context (GstElement * element,
+static gboolean gst_gl_log_overlay_query (GstBaseSrc * bsrc, GstQuery * query);
+static void gst_gl_log_overlay_set_context (GstElement * element,
     GstContext * context);
-static GstStateChangeReturn gst_gl_dispaly_errors_change_state (GstElement * element,
+static GstStateChangeReturn gst_gl_log_overlay_change_state (GstElement * element,
     GstStateChange transition);
 
-static void gst_gl_dispaly_errors_get_times (GstBaseSrc * basesrc,
+static void gst_gl_log_overlay_get_times (GstBaseSrc * basesrc,
     GstBuffer * buffer, GstClockTime * start, GstClockTime * end);
-static GstFlowReturn gst_gl_dispaly_errors_fill (GstPushSrc * psrc,
+static GstFlowReturn gst_gl_log_overlay_fill (GstPushSrc * psrc,
     GstBuffer * buffer);
-static gboolean gst_gl_dispaly_errors_start (GstBaseSrc * basesrc);
-static gboolean gst_gl_dispaly_errors_stop (GstBaseSrc * basesrc);
-static gboolean gst_gl_dispaly_errors_decide_allocation (GstBaseSrc * basesrc,
+static gboolean gst_gl_log_overlay_start (GstBaseSrc * basesrc);
+static gboolean gst_gl_log_overlay_stop (GstBaseSrc * basesrc);
+static gboolean gst_gl_log_overlay_decide_allocation (GstBaseSrc * basesrc,
     GstQuery * query);
 
-static gboolean gst_gl_dispaly_errors_init_shader (GstGLDisplayErrors * gldisplayerrors);
+static gboolean gst_gl_log_overlay_init_shader (GstGLLogOverlay * gllogoverlay);
 
-static GstFlowReturn gst_gl_dispaly_errors_chain (GstPad * pad,
+static GstFlowReturn gst_gl_log_overlay_chain (GstPad * pad,
     GstObject * parent, GstBuffer * buffer);
 
-static void gst_gl_dispaly_errors_dispose (GObject * object);
+static void gst_gl_log_overlay_dispose (GObject * object);
 
-#define gst_gl_dispaly_errors_parent_class parent_class
+#define gst_gl_log_overlay_parent_class parent_class
 
 static GstCaps *
-gst_gl_dispaly_errors_fixate (GstBaseSrc * bsrc, GstCaps * caps)
+gst_gl_log_overlay_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 {
   GstStructure *structure;
 
@@ -140,7 +140,7 @@ gst_gl_dispaly_errors_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 
 
 static void
-gst_gl_dispaly_errors_close_gldraw (GstGLContext * context, GstGLDisplayErrors * src){
+gst_gl_log_overlay_close_gldraw (GstGLContext * context, GstGLLogOverlay * src){
   if(src->gl_drawing.gl_drawing_created==TRUE){
     gldraw_close (src->context, &src->gl_drawing);
     src->gl_drawing.gl_drawing_created=FALSE;
@@ -148,10 +148,10 @@ gst_gl_dispaly_errors_close_gldraw (GstGLContext * context, GstGLDisplayErrors *
 }
 
 static void
-gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
+gst_gl_log_overlay_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (object);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (object);
 
   switch (prop_id) {
 
@@ -165,7 +165,7 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
       gldraw_set_history_errors_window_size(&src->gl_drawing, g_value_get_int(value));
       if(src->context){
         gst_gl_context_thread_add (src->context,
-          (GstGLContextThreadFunc) gst_gl_dispaly_errors_close_gldraw, src);
+          (GstGLContextThreadFunc) gst_gl_log_overlay_close_gldraw, src);
       }
       break;
     case PROP_TEXT_COLOR_ARGB:
@@ -178,7 +178,7 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
       errors_handler_clear(&src->gl_drawing, src->errors_handler);
       if(src->context){
         gst_gl_context_thread_add (src->context,
-          (GstGLContextThreadFunc) gst_gl_dispaly_errors_close_gldraw, src);
+          (GstGLContextThreadFunc) gst_gl_log_overlay_close_gldraw, src);
       }
       break;
     case PROP_FONT_CAPTION:
@@ -186,7 +186,7 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
         gldraw_set_font_caption(&src->gl_drawing,g_value_get_string(value));
         if(src->context){
           gst_gl_context_thread_add (src->context,
-            (GstGLContextThreadFunc) gst_gl_dispaly_errors_close_gldraw, src);
+            (GstGLContextThreadFunc) gst_gl_log_overlay_close_gldraw, src);
         }
       }
       break;
@@ -195,7 +195,7 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
         gldraw_set_font_style(&src->gl_drawing,g_value_get_string(value));
         if(src->context){
             gst_gl_context_thread_add (src->context,
-              (GstGLContextThreadFunc) gst_gl_dispaly_errors_close_gldraw, src);
+              (GstGLContextThreadFunc) gst_gl_log_overlay_close_gldraw, src);
         }
       }
       break;
@@ -206,11 +206,11 @@ gst_gl_dispaly_errors_set_property (GObject * object, guint prop_id,
 }
 
 static void
-gst_gl_dispaly_errors_get_property (GObject * object, guint prop_id,
+gst_gl_log_overlay_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
 
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (object);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (object);
 
   switch (prop_id) {
     case PROP_TIMESTAMP_OFFSET:
@@ -230,18 +230,18 @@ gst_gl_dispaly_errors_get_property (GObject * object, guint prop_id,
 }
 
 static gboolean
-gst_gl_dispaly_errors_setcaps (GstBaseSrc * bsrc, GstCaps * caps)
+gst_gl_log_overlay_setcaps (GstBaseSrc * bsrc, GstCaps * caps)
 {
-  GstGLDisplayErrors *gldisplayerrors = GST_GL_DISPLAY_ERRORS (bsrc);
+  GstGLLogOverlay *gllogoverlay = GST_GL_LOG_OVERLAYS (bsrc);
 
   GST_DEBUG ("setcaps");
 
-  if (!gst_video_info_from_caps (&gldisplayerrors->vinfo, caps))
+  if (!gst_video_info_from_caps (&gllogoverlay->vinfo, caps))
     goto wrong_caps;
 
-  gldisplayerrors->negotiated = TRUE;
+  gllogoverlay->negotiated = TRUE;
 
-  gst_caps_replace (&gldisplayerrors->out_caps, caps);
+  gst_caps_replace (&gllogoverlay->out_caps, caps);
 
   return TRUE;
 
@@ -254,9 +254,9 @@ wrong_caps:
 }
 
 static void
-gst_gl_dispaly_errors_set_context (GstElement * element, GstContext * context)
+gst_gl_log_overlay_set_context (GstElement * element, GstContext * context)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (element);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (element);
 
   gst_gl_handle_set_context (element, context, &src->display,
       &src->other_context);
@@ -268,12 +268,12 @@ gst_gl_dispaly_errors_set_context (GstElement * element, GstContext * context)
 }
 
 static gboolean
-gst_gl_dispaly_errors_query (GstBaseSrc * bsrc, GstQuery * query)
+gst_gl_log_overlay_query (GstBaseSrc * bsrc, GstQuery * query)
 {
   gboolean res = FALSE;
-  GstGLDisplayErrors *src;
+  GstGLLogOverlay *src;
 
-  src = GST_GL_DISPLAY_ERRORS (bsrc);
+  src = GST_GL_LOG_OVERLAYS (bsrc);
 
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CONTEXT:
@@ -304,7 +304,7 @@ gst_gl_dispaly_errors_query (GstBaseSrc * bsrc, GstQuery * query)
 }
 
 static void
-gst_gl_dispaly_errors_get_times (GstBaseSrc * basesrc, GstBuffer * buffer,
+gst_gl_log_overlay_get_times (GstBaseSrc * basesrc, GstBuffer * buffer,
     GstClockTime * start, GstClockTime * end)
 {
   /* for live sources, sync on the timestamp of the buffer */
@@ -326,12 +326,12 @@ gst_gl_dispaly_errors_get_times (GstBaseSrc * basesrc, GstBuffer * buffer,
 }
 
 static gboolean
-gst_gl_dispaly_errors_do_seek (GstBaseSrc * bsrc, GstSegment * segment)
+gst_gl_log_overlay_do_seek (GstBaseSrc * bsrc, GstSegment * segment)
 {
   GstClockTime time;
-  GstGLDisplayErrors *src;
+  GstGLLogOverlay *src;
 
-  src = GST_GL_DISPLAY_ERRORS (bsrc);
+  src = GST_GL_LOG_OVERLAYS (bsrc);
 
   segment->time = segment->start;
   time = segment->position;
@@ -357,16 +357,16 @@ gst_gl_dispaly_errors_do_seek (GstBaseSrc * bsrc, GstSegment * segment)
 }
 
 static gboolean
-gst_gl_dispaly_errors_is_seekable (GstBaseSrc * psrc)
+gst_gl_log_overlay_is_seekable (GstBaseSrc * psrc)
 {
   /* we're seekable... */
   return TRUE;
 }
 
 static gboolean
-gst_gl_dispaly_errors_init_shader (GstGLDisplayErrors * gldisplayerrors)
+gst_gl_log_overlay_init_shader (GstGLLogOverlay * gllogoverlay)
 {
-  if (gst_gl_context_get_gl_api (gldisplayerrors->context)) {
+  if (gst_gl_context_get_gl_api (gllogoverlay->context)) {
     /* blocking call, wait until the opengl thread has compiled the shader */
   }
   return TRUE;
@@ -374,10 +374,10 @@ gst_gl_dispaly_errors_init_shader (GstGLDisplayErrors * gldisplayerrors)
 
 
 static gboolean
-gst_gl_dispaly_errors_callback (gpointer stuff)
+gst_gl_log_overlay_callback (gpointer stuff)
 {
 
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (stuff);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (stuff);
 
   gboolean res=FALSE;
   float a,r,g,b;
@@ -427,18 +427,18 @@ gst_gl_dispaly_errors_callback (gpointer stuff)
 
 
 static void
-_fill_gl (GstGLContext * context, GstGLDisplayErrors * src)
+_fill_gl (GstGLContext * context, GstGLLogOverlay * src)
 {
 
   src->gl_result = gst_gl_framebuffer_draw_to_texture (src->fbo, src->out_tex,
-      gst_gl_dispaly_errors_callback, src);
+      gst_gl_log_overlay_callback, src);
 
 }
 
 static GstFlowReturn
-gst_gl_dispaly_errors_fill (GstPushSrc * psrc, GstBuffer * buffer)
+gst_gl_log_overlay_fill (GstPushSrc * psrc, GstBuffer * buffer)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (psrc);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (psrc);
   GstClockTime next_time;
   GstVideoFrame out_frame;
   GstGLSyncMeta *sync_meta;
@@ -510,9 +510,9 @@ eos:
 }
 
 static gboolean
-gst_gl_dispaly_errors_start (GstBaseSrc * basesrc)
+gst_gl_log_overlay_start (GstBaseSrc * basesrc)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (basesrc);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (basesrc);
 
   if (!gst_gl_ensure_element_data (src, &src->display, &src->other_context))
     return FALSE;
@@ -527,7 +527,7 @@ gst_gl_dispaly_errors_start (GstBaseSrc * basesrc)
 }
 
 static void
-gst_gl_dispaly_errors_gl_stop (GstGLContext * context, GstGLDisplayErrors * src)
+gst_gl_log_overlay_gl_stop (GstGLContext * context, GstGLLogOverlay * src)
 {
   if (src->fbo)
     gst_object_unref (src->fbo);
@@ -541,13 +541,13 @@ gst_gl_dispaly_errors_gl_stop (GstGLContext * context, GstGLDisplayErrors * src)
 }
 
 static gboolean
-gst_gl_dispaly_errors_stop (GstBaseSrc * basesrc)
+gst_gl_log_overlay_stop (GstBaseSrc * basesrc)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (basesrc);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (basesrc);
 
   if (src->context)
     gst_gl_context_thread_add (src->context,
-        (GstGLContextThreadFunc) gst_gl_dispaly_errors_gl_stop, src);
+        (GstGLContextThreadFunc) gst_gl_log_overlay_gl_stop, src);
 
   gst_caps_replace (&src->out_caps, NULL);
 
@@ -559,7 +559,7 @@ gst_gl_dispaly_errors_stop (GstBaseSrc * basesrc)
 }
 
 static gboolean
-_find_local_gl_context (GstGLDisplayErrors * src)
+_find_local_gl_context (GstGLLogOverlay * src)
 {
   if (gst_gl_query_local_gl_context (GST_ELEMENT (src), GST_PAD_SRC,
           &src->context))
@@ -568,7 +568,7 @@ _find_local_gl_context (GstGLDisplayErrors * src)
 }
 
 static void
-_src_generate_fbo_gl (GstGLContext * context, GstGLDisplayErrors * src)
+_src_generate_fbo_gl (GstGLContext * context, GstGLLogOverlay * src)
 {
   src->fbo = gst_gl_framebuffer_new_with_default_depth (src->context,
       GST_VIDEO_INFO_WIDTH (&src->vinfo),
@@ -576,9 +576,9 @@ _src_generate_fbo_gl (GstGLContext * context, GstGLDisplayErrors * src)
 }
 
 static gboolean
-gst_gl_dispaly_errors_decide_allocation (GstBaseSrc * basesrc, GstQuery * query)
+gst_gl_log_overlay_decide_allocation (GstBaseSrc * basesrc, GstQuery * query)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (basesrc);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (basesrc);
   GstBufferPool *pool = NULL;
   GstStructure *config;
   GstCaps *caps;
@@ -619,7 +619,7 @@ gst_gl_dispaly_errors_decide_allocation (GstBaseSrc * basesrc, GstQuery * query)
 
   if (src->context)
     gst_gl_context_thread_add (src->context,
-        (GstGLContextThreadFunc) gst_gl_dispaly_errors_gl_stop, src);
+        (GstGLContextThreadFunc) gst_gl_log_overlay_gl_stop, src);
 
   gst_gl_context_thread_add (src->context,
       (GstGLContextThreadFunc) _src_generate_fbo_gl, src);
@@ -665,7 +665,7 @@ gst_gl_dispaly_errors_decide_allocation (GstBaseSrc * basesrc, GstQuery * query)
   else
     gst_query_add_allocation_pool (query, pool, size, min, max);
 
-  gst_gl_dispaly_errors_init_shader (src);
+  gst_gl_log_overlay_init_shader (src);
 
   gst_object_unref (pool);
 
@@ -701,9 +701,9 @@ context_error:
 }
 
 static GstStateChangeReturn
-gst_gl_dispaly_errors_change_state (GstElement * element, GstStateChange transition)
+gst_gl_log_overlay_change_state (GstElement * element, GstStateChange transition)
 {
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (element);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (element);
   GstStateChangeReturn ret = GST_STATE_CHANGE_SUCCESS;
 
   GST_DEBUG_OBJECT (src, "changing state: %s => %s",
@@ -753,7 +753,7 @@ gst_gl_dispaly_errors_change_state (GstElement * element, GstStateChange transit
 
 
 
-static GstStaticPadTemplate gst_gl_dispaly_errors_sink_template =
+static GstStaticPadTemplate gst_gl_log_overlay_sink_template =
 GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
@@ -761,9 +761,9 @@ GST_STATIC_PAD_TEMPLATE ("sink",
     );
 
 
-static void gst_gl_dispaly_errors_dispose (GObject * object){
+static void gst_gl_log_overlay_dispose (GObject * object){
 
-  GstGLDisplayErrors *src = GST_GL_DISPLAY_ERRORS (object);
+  GstGLLogOverlay *src = GST_GL_LOG_OVERLAYS (object);
 
   if(src->errors_handler!=NULL){
     free(src->errors_handler);
@@ -775,14 +775,14 @@ static void gst_gl_dispaly_errors_dispose (GObject * object){
 }
 
 static void
-gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
+gst_gl_log_overlay_class_init (GstGLLogOverlayClass * klass)
 {
   GObjectClass *gobject_class;
   GstBaseSrcClass *gstbasesrc_class;
   GstPushSrcClass *gstpushsrc_class;
   GstElementClass *element_class;
 
-  GST_DEBUG_CATEGORY_INIT (gl_dispaly_errors_debug, "gldisplayerrors", 0,
+  GST_DEBUG_CATEGORY_INIT (gl_log_overlay_debug, "gllogoverlay", 0,
       "Video Test Source");
 
   gobject_class = (GObjectClass *) klass;
@@ -790,10 +790,10 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
   gstpushsrc_class = (GstPushSrcClass *) klass;
   element_class = GST_ELEMENT_CLASS (klass);
 
-  gobject_class->set_property = gst_gl_dispaly_errors_set_property;
-  gobject_class->get_property = gst_gl_dispaly_errors_get_property;
+  gobject_class->set_property = gst_gl_log_overlay_set_property;
+  gobject_class->get_property = gst_gl_log_overlay_get_property;
 
-  gobject_class->dispose = gst_gl_dispaly_errors_dispose;
+  gobject_class->dispose = gst_gl_log_overlay_dispose;
 
   g_object_class_install_property (gobject_class,
       PROP_TIMESTAMP_OFFSET, g_param_spec_int64 ("timestamp-offset",
@@ -840,39 +840,39 @@ gst_gl_dispaly_errors_class_init (GstGLDisplayErrorsClass * klass)
                           0, G_MAXUINT32, 0xff000000,
                           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS ));
 
-  gst_element_class_set_metadata (element_class, "gldisplayerrors",
+  gst_element_class_set_metadata (element_class, "gllogoverlay",
       "Gl display errors", "Gl display errors",
       "NIIT. Fedotov Ivan. <ivanfedotovmail@yandex.ru>");
 
   gst_element_class_add_static_pad_template (element_class, &src_factory);
 
-  element_class->set_context = gst_gl_dispaly_errors_set_context;
-  element_class->change_state = gst_gl_dispaly_errors_change_state;
+  element_class->set_context = gst_gl_log_overlay_set_context;
+  element_class->change_state = gst_gl_log_overlay_change_state;
 
-  gstbasesrc_class->set_caps = gst_gl_dispaly_errors_setcaps;
-  gstbasesrc_class->is_seekable = gst_gl_dispaly_errors_is_seekable;
-  gstbasesrc_class->do_seek = gst_gl_dispaly_errors_do_seek;
-  gstbasesrc_class->query = gst_gl_dispaly_errors_query;
-  gstbasesrc_class->get_times = gst_gl_dispaly_errors_get_times;
-  gstbasesrc_class->start = gst_gl_dispaly_errors_start;
-  gstbasesrc_class->stop = gst_gl_dispaly_errors_stop;
-  gstbasesrc_class->fixate = gst_gl_dispaly_errors_fixate;
-  gstbasesrc_class->decide_allocation = gst_gl_dispaly_errors_decide_allocation;
+  gstbasesrc_class->set_caps = gst_gl_log_overlay_setcaps;
+  gstbasesrc_class->is_seekable = gst_gl_log_overlay_is_seekable;
+  gstbasesrc_class->do_seek = gst_gl_log_overlay_do_seek;
+  gstbasesrc_class->query = gst_gl_log_overlay_query;
+  gstbasesrc_class->get_times = gst_gl_log_overlay_get_times;
+  gstbasesrc_class->start = gst_gl_log_overlay_start;
+  gstbasesrc_class->stop = gst_gl_log_overlay_stop;
+  gstbasesrc_class->fixate = gst_gl_log_overlay_fixate;
+  gstbasesrc_class->decide_allocation = gst_gl_log_overlay_decide_allocation;
 
-  gstpushsrc_class->fill = gst_gl_dispaly_errors_fill;
+  gstpushsrc_class->fill = gst_gl_log_overlay_fill;
 
   gst_element_class_add_static_pad_template (element_class,
-      &gst_gl_dispaly_errors_sink_template);
+      &gst_gl_log_overlay_sink_template);
 
 }
 
 static GstFlowReturn
-gst_gl_dispaly_errors_chain (GstPad * pad, GstObject * parent,
+gst_gl_log_overlay_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
 {
 
-  GstGLDisplayErrors *src;
-  src = GST_GL_DISPLAY_ERRORS (parent);
+  GstGLLogOverlay *src;
+  src = GST_GL_LOG_OVERLAYS (parent);
 
   int size_data;
   size_data=gst_buffer_get_size(buffer);
@@ -894,7 +894,7 @@ gst_gl_dispaly_errors_chain (GstPad * pad, GstObject * parent,
 
 
 static gboolean
-gst_gl_dispaly_errors_sink_event (GstPad * pad, GstObject * parent,
+gst_gl_log_overlay_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
   gboolean res=TRUE;
@@ -919,7 +919,7 @@ gst_gl_dispaly_errors_sink_event (GstPad * pad, GstObject * parent,
 
 
 static void
-gst_gl_dispaly_errors_init (GstGLDisplayErrors * src)
+gst_gl_log_overlay_init (GstGLLogOverlay * src)
 {
 
   src->timestamp_offset = 0;
@@ -935,7 +935,7 @@ gst_gl_dispaly_errors_init (GstGLDisplayErrors * src)
   errors_handler_first_init(src->errors_handler);
   gldraw_set_error_draw_callback(&src->gl_drawing, src->errors_handler, errors_handler_draw_callback);
 
-  GstGLDisplayErrorsClass *filter_class = GST_GL_DISPLAY_ERRORS_CLASS (G_OBJECT_GET_CLASS (src));
+  GstGLLogOverlayClass *filter_class = GST_GL_LOG_OVERLAYS_CLASS (G_OBJECT_GET_CLASS (src));
 
   GstPadTemplate *pad_template;
 
@@ -945,23 +945,23 @@ gst_gl_dispaly_errors_init (GstGLDisplayErrors * src)
 
   src->sinkpad = gst_pad_new_from_template (pad_template, "sink");
   gst_pad_set_chain_function (src->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_gl_dispaly_errors_chain));
+      GST_DEBUG_FUNCPTR (gst_gl_log_overlay_chain));
   gst_pad_set_event_function (src->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_gl_dispaly_errors_sink_event));
+      GST_DEBUG_FUNCPTR (gst_gl_log_overlay_sink_event));
   gst_element_add_pad (GST_ELEMENT (src), src->sinkpad);
 
 }
 
 
 static gboolean
-gl_dispaly_errors_init (GstPlugin * gl_dispaly_errors)
+gl_log_overlay_init (GstPlugin * gl_log_overlay)
 {
 
-  GST_DEBUG_CATEGORY_INIT (gl_dispaly_errors_debug, "gldisplayerrors",
-      0, "Template gldisplayerrors");
+  GST_DEBUG_CATEGORY_INIT (gl_log_overlay_debug, "gllogoverlay",
+      0, "Template gllogoverlay");
 
-  return gst_element_register (gl_dispaly_errors, "gldisplayerrors", GST_RANK_NONE,
-      GST_TYPE_GL_DISPLAY_ERRORS);
+  return gst_element_register (gl_log_overlay, "gllogoverlay", GST_RANK_NONE,
+      GST_TYPE_GL_LOG_OVERLAYS);
 }
 
 /* PACKAGE: this is usually set by autotools depending on some _INIT macro
@@ -970,19 +970,19 @@ gl_dispaly_errors_init (GstPlugin * gl_dispaly_errors)
  * compile this code. GST_PLUGIN_DEFINE needs PACKAGE to be defined.
  */
 #ifndef PACKAGE
-#define PACKAGE "gldisplayerrors"
+#define PACKAGE "gllogoverlay"
 #endif
 
-/* gstreamer looks for this structure to register gl_dispaly_errorss
+/* gstreamer looks for this structure to register gl_log_overlays
  *
- * exchange the string 'Template gl_dispaly_errors' with your gl_dispaly_errors description
+ * exchange the string 'Template gl_log_overlay' with your gl_log_overlay description
  */
 GST_PLUGIN_DEFINE (
     GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    gldisplayerrors,
-    "Template gldisplayerrors",
-    gl_dispaly_errors_init,
+    gllogoverlay,
+    "Template gllogoverlay",
+    gl_log_overlay_init,
     "1.0",
     "LGPL",
     "GStreamer",

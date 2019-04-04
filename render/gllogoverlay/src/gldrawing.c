@@ -269,21 +269,20 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
   int runes_sz,cur_pix_len,runes_less_num,chars_less_num;
   rune_ex rune;
   int i,inp_sz;
+  int prev_rune_len;
 
   nk_handle handle1;
   handle1.ptr=font_ptr;
 
   inp_sz=strlen(str);
-
   if(inp_sz==0)return 0;
-
   runes_sz=nk_utf_len(str, inp_sz);
-
   if(runes_sz==0)return 0;
 
   cur_pix_len=0;
   runes_less_num=0;
   chars_less_num=0;
+  prev_rune_len=0;
   for(i=0;i<runes_sz;i++){
     nk_utf_at(str,inp_sz,i,&rune.rune,&rune.rune_len);
     if(chars_less_num+rune.rune_len>inp_sz){
@@ -292,9 +291,10 @@ int calc_cut_string_len_in_chars_num(struct nk_font *font_ptr,char *str,int max_
     cur_pix_len+=nk_font_text_width(handle1,font_ptr->info.height,&str[chars_less_num],rune.rune_len);
     if(cur_pix_len>max_pixels_str_len){
         runes_less_num--;
-        chars_less_num-=rune.rune_len;
+        chars_less_num-=prev_rune_len;
         break;
     }
+    prev_rune_len=rune.rune_len;
     chars_less_num+=rune.rune_len;
     runes_less_num++;
 
@@ -349,8 +349,6 @@ void calc_one_line(GstClock *pipeline_clock,
                    ){
 
       int i;
-
-
 
       text_line->border_thick=border_thick;
       if(text_line->border_thick<2.0)text_line->border_thick=2.0;
@@ -462,16 +460,32 @@ void calc_one_line(GstClock *pipeline_clock,
       len=strlen(text_line->displayedErrorData.msg);
       max_text_len_pixels=text_line->text_lx;
 
+
+      int char_point_len_pix=0;
+
       for(i=0;i<text_line->fonts_ptrs_num;i++){
+
+         char_point_len_pix=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[i],
+                                                  ".",
+                                                  10000);
 
          len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[i],
                                                   text_line->displayedErrorData.msg,
-                                                  max_text_len_pixels-10);
+                                                  max_text_len_pixels-20-char_point_len_pix*3);
          text_line->fonts_ptr_selected=i;
          if(len==len_cut){
            break;
          }
       }
+/*
+      if(text_line->displayedErrorData.msg[0]=='2' && len_cut!=92){
+        int aa;
+        aa=0;
+        len_cut=calc_cut_string_len_in_chars_num(text_line->fonts_ptrs[0],
+                                                  text_line->displayedErrorData.msg,
+                                                  max_text_len_pixels-10);
+      }
+*/
 
       if(len>0 && len<text_line_size){
 
@@ -504,6 +518,12 @@ void calc_one_line(GstClock *pipeline_clock,
 
       handle1.ptr=_font_time_text_ptr;
       text_line->text_time_lx=nk_font_text_width(handle1,_font_time_text_ptr->info.height,text_line->text_time,strlen(text_line->text_time));
+
+
+
+
+      //<<<
+      //text_line->text_lx=1000;
 
 }
 
@@ -562,7 +582,7 @@ void calc_all_draw_sizes(GlDrawing *src){
                 &src->big_textline,
                 x, y, lx, ly,
                 input_fonts,1,
-                src->font_small_text_line,
+                src->font_big_text_line,
                 0.05, 0.68,
                 0.77, 0.95,
                 ly/2-src->font_big_text_line->info.height/2,
@@ -1038,14 +1058,14 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
         if(tr->displayedErrorData.flag_show_this==1){
           if(tr->displayedErrorData.flag_allow_rect_blink==1 && tr->displayedErrorData.flag_is_continuous==1){
             if(blink_flag==1){
-              nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
+              nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), 0, tr->border_thick,
                          nk_rgba(src->big_textline.border_color[0],
                                  src->big_textline.border_color[1],
                                  src->big_textline.border_color[2],
                                  src->big_textline.border_color[3]));
             }
           }else{
-              nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
+              nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), 0, tr->border_thick,
                          nk_rgba(src->big_textline.border_color[0],
                                  src->big_textline.border_color[1],
                                  src->big_textline.border_color[2],
@@ -1065,12 +1085,12 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
 
             if(tr->displayedErrorData.flag_show_this==1){
                 if(tr->background_enabled_flag==1)
-                  nk_fill_rect(commands, nk_rect(tr->x,tr->y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
+                  nk_fill_rect(commands, nk_rect(tr->x,tr->y,tr->lx,tr->ly), 0, nk_rgba(tr->background_color[0],
                                                                                          tr->background_color[1],
                                                                                          tr->background_color[2],
                                                                                          tr->background_color[3]));
 
-                nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
+                nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y,tr->border_lx,tr->border_ly), 0, tr->border_thick,
                                  nk_rgba(tr->border_color[0],
                                          tr->border_color[1],
                                          tr->border_color[2],
@@ -1123,12 +1143,12 @@ gboolean gldraw_render(GstGLContext * context, GlDrawing *src)
               if(tr->displayedErrorData.flag_show_this==1){
 
                   if(tr->background_enabled_flag==1)
-                    nk_fill_rect(commands, nk_rect(tr->x,tr->y+src->history_textlines_shift_y,tr->lx,tr->ly), tr->border_thick*3, nk_rgba(tr->background_color[0],
+                    nk_fill_rect(commands, nk_rect(tr->x,tr->y+src->history_textlines_shift_y,tr->lx,tr->ly), 0, nk_rgba(tr->background_color[0],
                                                                                          tr->background_color[1],
                                                                                          tr->background_color[2],
                                                                                          tr->background_color[3]));
 
-                  nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y+src->history_textlines_shift_y,tr->border_lx,tr->border_ly), tr->border_thick*3, tr->border_thick,
+                  nk_stroke_rect(commands, nk_rect(tr->border_x,tr->border_y+src->history_textlines_shift_y,tr->border_lx,tr->border_ly), 0, tr->border_thick,
                                  nk_rgba(tr->border_color[0],
                                          tr->border_color[1],
                                          tr->border_color[2],
