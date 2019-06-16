@@ -97,19 +97,17 @@ typedef struct{
   //Отношение ширины к длине 1 бара
   float bar_aspect;
   //Процент высоты риски к высоте бара
-  float band_len_percent;
+  //float band_len_percent;
   //Процент расстояния между рисками к высоте бара
-  float band_distanse_percent;
+  //float band_distanse_percent;
   //высота пика в процентах от высоты бара
   float peak_height_percent;
 
+  float peak_size;
   float bars_begin;
   float bars_end;
   float bar_len;
   float bar_step;
-  float band_len;
-  float band_distanse;
-  float peak_size;
 
   int draw_direction;
 
