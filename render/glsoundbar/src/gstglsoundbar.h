@@ -37,10 +37,7 @@
 
 #include "gldrawing.h"
 
-
 G_BEGIN_DECLS
-
-
 
 #define GST_TYPE_GLSOUNDBAR \
   (gst_glsoundbar_get_type())
@@ -53,9 +50,6 @@ G_BEGIN_DECLS
 #define GST_IS_GLSOUNDBAR_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_GLSOUNDBAR))
 
-
-
-
 typedef struct _GstGLSoundbar      GstGLSoundbar;
 typedef struct _GstGLSoundbarClass GstGLSoundbarClass;
 typedef struct _GstGLSoundbarPrivate GstGLSoundbarPrivate;
@@ -66,6 +60,9 @@ enum {
  GLSOUND_BAR_DRAW_DIRECTION_TO_RIGHT
 
 };
+
+gboolean my_g_object_get_property(GObject *object,
+                       const gchar *property_name);
 
 struct _GstGLSoundbar
 {
@@ -101,8 +98,9 @@ struct _GstGLSoundbar
 
   loudness result;
 
-
   GstBuffer *prev_push_outbuf;
+
+  GMutex mutex_chain_function;
 
 };
 

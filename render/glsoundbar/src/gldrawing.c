@@ -51,7 +51,6 @@
 #define PEAK_SIZE 3.0
 #define BAR_ASPECT 0.5
 
-
 static const gchar *bar_vertex_src =
     "#version 120\n"
     "attribute vec4 position;\n"
@@ -59,7 +58,6 @@ static const gchar *bar_vertex_src =
     "{\n"
     "   gl_Position = position;\n"
     "}";
-
 
 static const gchar *bar_fragment_src =
     "#version 120\n"
@@ -112,8 +110,8 @@ static const gchar *bar_fragment_src =
     "          int index=0;"
     "          index=int(floor(-5.556*(1.0-coord_xy.y)+6.222));"
     "          index=min(index,4);"
-    "          gl_FragColor=color_audio_levels[index];\n"
-    "          return;\n"
+    "            gl_FragColor=color_audio_levels[index];\n"
+    "            return;\n"
     "      }\n"
     "   }"
     "   else{"
@@ -128,13 +126,12 @@ static const gchar *bar_fragment_src =
     "          int index=0;"
     "          index=int(floor(-5.556*coord_xy.x+6.222));"
     "          index=min(index,4);"
-    "          gl_FragColor=color_audio_levels[index];\n"
-    "          return;\n"
+    "            gl_FragColor=color_audio_levels[index];\n"
+    "            return;\n"
     "      }\n"
     "   }"
     "   gl_FragColor = bg_color;\n"
     "}";
-
 
 void gldraw_first_init(GlDrawing *src){
 
@@ -147,7 +144,6 @@ void gldraw_first_init(GlDrawing *src){
 
 }
 
-
 void setBGColor(GlDrawing *src, unsigned int color){
 
   src->bg_color.R=(float)((color & 0x00ff0000)>>16)/255.0;
@@ -156,7 +152,6 @@ void setBGColor(GlDrawing *src, unsigned int color){
   src->bg_color.A=(float)((color & 0xff000000)>>24)/255.0;
 
 }
-
 
 gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result,
                       int width, int height,
@@ -168,12 +163,6 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
 {
 
   float channels;
-  //горизонтально относительно вертикального направления бара
-  float horizontal_size_pix;
-  //вертикально относительно вертикального направления бара
-  float vertical_size_pix;
-
-  int len;
 
   const GstGLFuncs *gl = context->gl_vtable;
 
@@ -225,7 +214,6 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
     }
   }
 
-
   if(gl->GenVertexArrays){
     gl->GenVertexArrays (1, &src->vao);
     gl->BindVertexArray (src->vao);
@@ -266,7 +254,6 @@ gboolean gldraw_init (GstGLContext * context, GlDrawing *src, loudness *audio_pr
 
   return ret;
 }
-
 
 gboolean gldraw_render(GstGLContext * context, GlDrawing *src, loudness *audio_proceess_result)
 {
