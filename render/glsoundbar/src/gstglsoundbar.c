@@ -347,10 +347,12 @@ gst_glsoundbar_src_setcaps (GstGLSoundbar * scope, GstCaps * caps)
   GST_DEBUG_OBJECT (scope, "doing allocation query");
   scope->priv->query = gst_query_new_allocation (caps, TRUE);
 
+/*  
   if (!gst_pad_peer_query (scope->priv->srcpad, scope->priv->query)) {
     // not a problem, we use the query defaults
     GST_DEBUG_OBJECT (scope, "allocation query failed");
   }
+*/  
 
   GST_DEBUG_OBJECT (scope, "calling decide_allocation");
 
