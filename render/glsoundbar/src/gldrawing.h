@@ -45,8 +45,8 @@ typedef struct {
 }loudness;
 
 //2 переменные должны быть оодинаковыми
-#define AUDIO_LEVELS (5)
-#define AUDIO_LEVELS_AS_STR "5"
+#define AUDIO_LEVELS_NUM (5)
+#define AUDIO_LEVELS_NUM_AS_STR "5"
 
 #define MAX_ATTRIBUTES 4
 
@@ -116,7 +116,7 @@ typedef struct{
 
   COLOR_COMPONENTS bg_color;
 
-  float audio_levels_in_pixels[AUDIO_LEVELS+1];
+  float audio_levels_in_pixels[AUDIO_LEVELS_NUM+1];
 
 
 }GlDrawing;
