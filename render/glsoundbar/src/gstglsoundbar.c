@@ -1,6 +1,7 @@
 /* 71.5
- * before patch resize in device fixed! (code with freeze error!)
+ * before patch resize in device fixed! (code with freeze error!) patch: https://github.com/IvanFedotovIvanFedotov/glsoundbar_patches read patches_links.txt
  * resize with restart fixed
+ * 
  *
  * Copyright (C) <2011> Stefan Kost <ensonic@users.sf.net>
  * Copyright (C) <2015> Luis de Bethencourt <luis@debethencourt.com>
