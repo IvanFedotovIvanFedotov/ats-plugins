@@ -1,4 +1,4 @@
-/* 71.5
+/* 71.6
  * before patch resize in device fixed! (code with freeze error!) patch: https://github.com/IvanFedotovIvanFedotov/glsoundbar_patches read patches_links.txt
  * resize with restart fixed
  *
@@ -61,17 +61,8 @@
 #include "gstglsoundbar.h"
 #include "gldrawing.h"
 
-//test:
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <time.h>
-
-
-
 GST_DEBUG_CATEGORY_STATIC (gst_glsoundbar_debug);
 #define GST_CAT_DEFAULT gst_glsoundbar_debug
-
 
 #define USE_PEER_BUFFERALLOC
 #define SUPPORTED_GL_APIS (GST_GL_API_ANY)
